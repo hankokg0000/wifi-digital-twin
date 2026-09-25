@@ -1,6 +1,6 @@
 import { test, expect, snapshot } from './helpers';
 
-test('sample house loads with 2 levels, 11 rooms, 2 radios, 1 agent', async ({ app: page }) => {
+test('sample house loads with 2 levels, 11 rooms, 2 radios, 4 agents', async ({ app: page }) => {
   const s = await snapshot(page);
 
   // Check levels
@@ -16,8 +16,8 @@ test('sample house loads with 2 levels, 11 rooms, 2 radios, 1 agent', async ({ a
   expect(s.doc.radios[0]!.role).toBe('ap');
   expect(s.doc.radios[1]!.role).toBe('ap');
 
-  // Check agents
-  expect(s.doc.agents).toHaveLength(1);
+  // Check agents (3 people + 1 pet, the "เช้าวันธรรมดา" scenario)
+  expect(s.doc.agents).toHaveLength(4);
 
   // Check initial state
   expect(s.activeLevelId).toBe(s.doc.levels[0]!.id);

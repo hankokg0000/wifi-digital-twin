@@ -1,6 +1,7 @@
 import type { SceneDoc, Vec2 } from './types';
 import { DEFAULT_MATERIALS } from './materials';
-import { addLevel, addWall, addOpening, addRoom, addObject, addRadio, addAgent } from './ops';
+import { addLevel, addWall, addOpening, addRoom, addObject, addRadio, addStair, setRoomRestricted, addZone, addIncident } from './ops';
+import { populate } from '../sim/populate';
 
 /**
  * A typical Thai two-storey detached house, footprint ~10 m (x) x 12 m (z).
@@ -10,6 +11,7 @@ import { addLevel, addWall, addOpening, addRoom, addObject, addRadio, addAgent }
 export function sampleHouse(): SceneDoc {
   let doc: SceneDoc = {
     version: 1,
+    seed: 42,
     materials: DEFAULT_MATERIALS.map((m) => ({ ...m, lossDb: { ...m.lossDb } })),
     levels: [],
     walls: [],
@@ -18,6 +20,10 @@ export function sampleHouse(): SceneDoc {
     objects: [],
     agents: [],
     radios: [],
+    stairs: [],
+    zones: [],
+    incidents: [],
+    population: { people: 0, pets: 0, fallsPerHour: 0 },
   };
 
   // --- Levels --------------------------------------------------------------
@@ -193,16 +199,6 @@ export function sampleHouse(): SceneDoc {
     position: [3, 2.0, 3],
   }).doc;
 
-  // Agent — one person walking a loop on the ground floor.
-  const loopPath: { t: number; p: Vec2 }[] = [
-    { t: 0, p: [2, 2] },
-    { t: 5, p: [8, 2] },
-    { t: 10, p: [8, 9] },
-    { t: 15, p: [2, 9] },
-    { t: 20, p: [2, 2] },
-  ];
-  doc = addAgent(doc, { levelId: level1, kind: 'person', path: loopPath }).doc;
-
   // ==========================================================================
   // Upper floor (level 2)
   // ==========================================================================
@@ -370,6 +366,51 @@ export function sampleHouse(): SceneDoc {
       { band: '5', channel: 149, txPowerDbm: 23 },
     ],
     antennaGainDbi: 3,
+  }).doc;
+
+  // ==========================================================================
+  // Stair — โถงบันได (ground) ↔ โถง (upper). Landings sit well clear of the surrounding
+  // walls/furniture (verified via planAgent warnings in the sim sanity check).
+  // ==========================================================================
+  doc = addStair(doc, {
+    fromLevelId: level1,
+    toLevelId: level2,
+    bottom: [6.5, 7.5],
+    top: [6.5, 10.5],
+    width: 1.0,
+  }).doc;
+
+  // ==========================================================================
+  // Population — random people + a pet, seed 42 (deterministic demo scenario). No generated
+  // falls here (fallsPerHour: 0); one explicit fall is added below instead so the demo always
+  // shows both fall alerts on the same, predictable person/time.
+  // ==========================================================================
+  doc = populate(doc, { people: 3, pets: 1, fallsPerHour: 0 }, 42);
+
+  const firstPerson = doc.agents.find((a) => a.kind === 'person')!;
+  doc = addIncident(doc, { agentId: firstPerson.id, t: 420, duration: 150 }).doc;
+
+  // ==========================================================================
+  // Zones — demonstrates restricted rooms (both appliesTo kinds) and a custom polygon zone.
+  // ==========================================================================
+  // ห้องครัว restricted for pets — cats/dogs wandering in are the demo's zone-entry alert.
+  doc = setRoomRestricted(doc, rKitchen.id, true, 'pet');
+  // ห้องนอนใหญ่ restricted for people — becomes "ห้องนอนใหญ่ (ห้ามเข้า)"; a roaming person
+  // wandering in demonstrates the other appliesTo kind.
+  doc = setRoomRestricted(doc, rMaster.id, true, 'person');
+  // A custom ~1.5x1.5 m zone just inside the front door, disabled by default — shows the
+  // free-polygon Zone tool without adding alert noise to the default demo.
+  doc = addZone(doc, {
+    levelId: level1,
+    name: 'ประตูหน้า',
+    appliesTo: 'any',
+    enabled: false,
+    polygon: [
+      [2.25, 0.2],
+      [3.75, 0.2],
+      [3.75, 1.7],
+      [2.25, 1.7],
+    ],
   }).doc;
 
   return doc;

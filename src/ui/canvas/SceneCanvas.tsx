@@ -4,6 +4,9 @@ import { OrthographicCamera, PerspectiveCamera, MapControls, OrbitControls } fro
 import { useSceneStore } from '../store';
 import { LevelsRenderer } from './LevelsRenderer';
 import { LabelProjector } from './LabelProjector';
+import { SimClock } from './SimClock';
+import { AgentsLayer } from './AgentsLayer';
+import { StairsLayer } from './StairsLayer';
 
 /**
  * Object positions (the camera's included, via props computed from `viewMode`/`activeLevelId`)
@@ -70,6 +73,9 @@ export function SceneCanvas() {
       )}
 
       <LevelsRenderer />
+      <StairsLayer />
+      <AgentsLayer />
+      <SimClock />
       <LabelProjector />
       <SceneMatrixSync />
     </Canvas>

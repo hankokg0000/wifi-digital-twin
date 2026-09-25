@@ -138,14 +138,46 @@ interface SceneObject {
   materialId: Id;
 }
 
+interface Waypoint { levelId: Id; p: Vec2; dwell: number }   // dwell = วินาทีที่หยุดนิ่งเมื่อถึง
+
+type AgentBehavior =
+  | { type: 'route'; waypoints: Waypoint[]; loop: boolean }             // legacy: core keeps it, UI no longer authors it
+  | { type: 'wander'; levelId: Id; roomId?: Id; pauseMin: number; pauseMax: number } // roomId undefined = whole level
+  | { type: 'roam'; dwellMin: number; dwellMax: number };               // person: random rooms on any level (uses stairs)
+
 interface Agent {
   id: Id;
-  levelId: Id;
+  name: string;
   kind: 'person' | 'pet';
-  radius: number;                 // person ≈ 0.2
-  height: number;                 // person ≈ 1.7
-  path: { t: number; p: Vec2 }[]; // waypoint ตามเวลา, loop
-  materialId: Id;                 // 'human-body'
+  color: string;           // สีสำหรับ render
+  radius: number;          // person 0.2, pet 0.15
+  height: number;          // person 1.7, pet 0.35
+  speed: number;           // m/s — person 1.2, pet 0.8
+  materialId: Id;          // 'human-body' (pet ก็ใช้ตัวนี้ไปก่อน)
+  start: Waypoint;         // จุด spawn ที่ t = 0 (dwell = เวลานิ่งตอนเริ่ม)
+  behavior: AgentBehavior;
+}
+
+interface Zone {
+  id: Id;
+  name: string;
+  levelId: Id;
+  roomId?: Id;              // ถ้าตั้งไว้ polygon จะตามรูปร่างห้องนั้น (ไม่ใช้ `polygon`)
+  polygon: Vec2[];          // ใช้เมื่อไม่มี roomId
+  appliesTo: 'person' | 'pet' | 'any';
+  enabled: boolean;
+}
+
+interface Incident { id: Id; kind: 'fall'; agentId: Id; t: number; duration: number } // duration = วินาทีที่ล้มนิ่งอยู่
+
+interface PopulationSettings { people: number; pets: number; fallsPerHour: number }  // UI default 3 / 1 / 0
+
+interface Stair {
+  id: Id;
+  fromLevelId: Id; toLevelId: Id;   // ชั้นล่าง → ชั้นบน
+  bottom: Vec2;                      // จุดลงบันไดบนพื้นชั้นล่าง
+  top: Vec2;                         // จุดขึ้นบันไดบนพื้นชั้นบน
+  width: number;                     // m, ~1.0
 }
 
 interface RadioIface {
@@ -166,6 +198,7 @@ interface Radio {
 
 interface SceneDoc {
   version: 1;
+  seed: number;             // deterministic simulation seed, default 1
   materials: Material[];
   levels: Level[];
   walls: Wall[];
@@ -174,10 +207,39 @@ interface SceneDoc {
   objects: SceneObject[];
   agents: Agent[];
   radios: Radio[];
+  stairs: Stair[];
+  zones: Zone[];
+  incidents: Incident[];
+  population: PopulationSettings;
 }
 ```
 
-`Agent`, `Opening.open` และ `Radio.ifaces` คือ **ส่วนที่เปลี่ยนตามเวลา** ของ World ส่วนที่เหลือเป็น Layout
+`Agent`, `Opening.open` และ `Radio.ifaces` คือ **ส่วนที่เปลี่ยนตามเวลา** ของ World ส่วนที่เหลือเป็น Layout (รวม `Stair` ด้วย — เป็นโครงสร้างคงที่เหมือน `Wall`)
+
+### 7.1 Simulation (`src/core/sim/`)
+
+Agent แต่ละตัวถูก **plan ล่วงหน้าทั้งหมด** เป็นลิสต์ของ `Segment` (`idle` / `walk` / `stair` / `fallen`) แทนที่จะจำลองทีละ tick — เพราะฉะนั้นการ query สถานะที่เวลา `t` ใดๆ (รวมถึงการลาก scrubber ย้อนไปมา) ทำได้เร็ว (binary search) โดยไม่ต้อง step จาก 0
+
+- **Deterministic**: `doc.seed` + `agent.id` (hash) → `rngFor()` ให้ PRNG (mulberry32) เฉพาะของ agent นั้น ไม่ขึ้นกับลำดับการ plan agent อื่น ดังนั้น doc เดียวกัน + seed เดียวกัน + เวลาเดียวกัน จะได้ world state เดิมเสมอ
+- **Navgrid**: ต่อ level หนึ่ง สร้าง occupancy grid ที่ 0.2 m/cell จาก bounding box ของ wall/room/object บน level นั้น (+ margin 1 m) เซลล์ถูก block ถ้าอยู่ในระยะ `wall.thickness/2 + agent.radius` จาก wall segment ใดๆ **ยกเว้น**ช่วงที่ตรงกับ door opening (ประตู ไม่ว่าจะเปิดหรือปิด — คนเปิดประตูเองได้); หน้าต่างนับเป็นกำแพงทึบเสมอ Object ที่สูงกว่า 0.3 m บล็อกทั้งคน/สัตว์เลี้ยง แคชต่อ (doc, levelId, radius, kind)
+- **Pathfinding**: A* 8-ทิศ (ห้ามตัดมุม) บน navgrid แล้ว string-pull ให้เหลือ polyline สั้นๆ คืน `null` ถ้าไปไม่ถึง จุดเริ่ม/จุดหมายถูก snap ไปเซลล์ว่างที่ใกล้ที่สุดภายใน 1 m
+- **ข้ามชั้น**: BFS หา chain ของ `Stair` ที่เชื่อมสอง level เดินไปจุดขึ้น/ลงบันได แล้วแทรก segment `stair` (เดินตรงจาก `bottom` ไป `top` ในระนาบ XZ พร้อม interpolate ความสูง) ระยะเวลา = `length3D / (speed × 0.6)`
+- **roam** (คน): สุ่มห้องจากทุกชั้น ถ่วงน้ำหนักด้วย sqrt(พื้นที่ห้อง) เพื่อให้ห้องเล็ก (เช่นห้องน้ำ) ก็ยังถูกเลือกบ้าง เดินไปจุดสุ่มที่ว่างในห้องนั้น (ข้ามชั้นผ่านบันไดได้) แล้ว idle `[dwellMin, dwellMax]`; ห้องที่ไปไม่ถึงลองใหม่สูงสุด 10 ครั้งก่อน idle 10 วินาทีแล้วลองรอบถัดไป
+- **wander ไม่มี roomId**: สุ่มจุดว่างที่ไหนก็ได้บนชั้นนั้น (ไม่ผูกกับห้องเดียว)
+- **Incident (ล้ม)**: ขณะ plan ถ้าเวลาของ `Incident` ตกอยู่ในช่วงของ segment ที่กำลังสร้าง จะตัด segment นั้น ณ เวลานั้น (ตำแหน่ง interpolate ตาม segment เดิม —ถ้าอยู่บนบันไดใช้จุดปัจจุบันบนบันได) แล้วแทรก segment `fallen` ยาว `duration` วินาที จากนั้น behavior เดิม (roam/wander/route) **เดินต่อ** จากจุดนั้นเหมือนไม่มีอะไรเกิดขึ้น (roam จะสุ่มเป้าหมายใหม่) ทำแบบ deterministic เหมือน segment อื่นๆ
+- **Horizon**: default 3600 วินาที (1 ชม.) — agent ที่ `loop: true` จะวนซ้ำ route จนกว่าจะครบ horizon ถ้า waypoint ไหนไปไม่ถึง จะข้ามไปตัวถัดไปพร้อม warning ใน `warnings[]`
+
+`planAll(doc, horizon)` คำนวณทุก agent ครั้งเดียว (memoize บน `doc` identity ฝั่ง UI) ส่วน `sampleWorld(doc, plans, t)` คือสิ่งที่ phase ถัดไปถือเป็น `home/sim/truth` — แต่ละ agent state มี `posture: 'standing' | 'walking' | 'fallen'` เพิ่มจาก position/heading/moving เดิม
+
+### 7.2 Alerts (`src/core/alerts/`)
+
+Pure function `computeAlerts(doc, stateAt, horizon, step = 0.5)` สแกนสถานะทุก agent ทุก `step` วินาทีตลอด horizon แล้วคืนลิสต์ `Alert` (เรียงตาม `t`) — ไม่มี side effect และผลลัพธ์เดิมเสมอถ้า input เดิม
+
+- **`stateAt: (t: number) => AgentState[]`** คือ**จุดต่อ** (seam) ที่ Phase 3 จะเสียบ estimator เข้ามาแทน: วันนี้ UI ส่ง `t => sampleWorld(doc, plans, t)` (ground truth ของ World) เข้ามาตรงๆ; พอมี estimator แล้วแค่เปลี่ยนฟังก์ชันที่ส่งเข้าไปเป็นสถานะที่ *ประมาณ* จาก Twin แทน — `computeAlerts` เองไม่ต้องแก้อะไรเลย (design.md §2 "World ≠ Twin")
+- **zone-entry** (warning): agent ที่ `appliesTo`/`kind` ตรงกัน เปลี่ยนจากนอกมาอยู่ในรูปหลายเหลี่ยมของ zone ที่ `enabled: true` บนชั้นเดียวกัน (ตรวจแบบ point-in-polygon ทุก step) — 1 แจ้งเตือนต่อการเข้าหนึ่งครั้ง
+- **fall** (critical): posture เปลี่ยนเป็น `fallen`
+- **fall-no-recovery** (critical): ยังคง `fallen` ต่อเนื่องเกิน 60 วินาที (แจ้งครั้งเดียวต่อการล้มหนึ่งครั้ง)
+- ชื่อห้องในข้อความใช้ point-in-polygon กับห้องบนชั้นนั้น ถ้าไม่อยู่ในห้องไหนแต่ใกล้บันไดจะขึ้น "บันได"
 
 ## 8. Propagation engine (Phase 1)
 
@@ -275,7 +337,7 @@ Payload เป็น JSON, `ts` เป็น ms epoch ห้าม estimator sub
 ## 12. Roadmap ถัดไป (ยังไม่ต้องออกแบบละเอียด)
 
 - **Phase 2** — Virtual sensors: ESP32 mesh วัด RSSI ระหว่าง node, กล้องเสมือน (frustum + occlusion raycast, detection = ground truth ที่ฉายภาพ + noise, เคารพ `cameraAllowed`)
-- **Phase 3** — Estimators: RTI จาก WiFi, triangulation จากกล้อง, fusion ด้วย particle filter, panel เทียบ Twin กับ Truth (position error, detection rate)
+- **Phase 3** — Estimators: RTI จาก WiFi, triangulation จากกล้อง, fusion ด้วย particle filter, panel เทียบ Twin กับ Truth (position error, detection rate) — Alerts (§7.2) จะสลับ `stateAt` จาก `sampleWorld` (ground truth) ไปใช้สถานะที่ประมาณจาก Twin แทน ผ่าน seam เดิมโดยไม่ต้องแก้ `computeAlerts`
 - **Phase 4** — Bridge: MQTT broker, ESP32 firmware, IP cam + detector, calibration
 - **Phase 5** — 2-way: Home Assistant integration (entities เข้า twin, commands ออก), automation rules บน twin state (เช่น ไม่มีคนในห้อง → ปิดไฟ; สัญญาณอ่อนในห้อง X → แนะนำจุดวาง AP/mesh)
 

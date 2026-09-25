@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Level, Vec2, Id } from '../../core';
-import { addWall, addOpening, addRoom, addObject, addRadio, updateObject, updateRadio } from '../../core';
+import { addWall, addOpening, addRoom, addObject, addRadio, addZone, updateObject, updateRadio } from '../../core';
 import { useSceneStore } from '../store';
 import { WallMesh } from './WallMesh';
 import { OpeningMesh } from './OpeningMesh';
 import { RoomMesh } from './RoomMesh';
 import { ObjectMesh } from './ObjectMesh';
 import { RadioMesh } from './RadioMesh';
-import { AgentMesh } from './AgentMesh';
+import { ZoneMesh } from './ZoneMesh';
 import { GridFloor } from './GridFloor';
 import { InteractionPlane } from './InteractionPlane';
 import { SnapIndicator, DraftChainPreview, OpeningPreview } from './Previews';
@@ -57,7 +57,7 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
   const rooms = useMemo(() => doc.rooms.filter((r) => r.levelId === level.id), [doc.rooms, level.id]);
   const objects = useMemo(() => doc.objects.filter((o) => o.levelId === level.id), [doc.objects, level.id]);
   const radios = useMemo(() => doc.radios.filter((r) => r.levelId === level.id), [doc.radios, level.id]);
-  const agents = useMemo(() => doc.agents.filter((a) => a.levelId === level.id), [doc.agents, level.id]);
+  const zones = useMemo(() => doc.zones.filter((z) => z.levelId === level.id), [doc.zones, level.id]);
   const materialColor = useCallback(
     (materialId: string) => doc.materials.find((m) => m.id === materialId)?.color ?? '#999999',
     [doc.materials],
@@ -116,7 +116,7 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
         return;
       }
 
-      if (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap') {
+      if (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap' || tool === 'zone') {
         setHoverPoint(computeSnap(raw, walls).point);
       } else if (tool === 'door' || tool === 'window') {
         setHoverPoint(raw);
@@ -193,6 +193,23 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
       if (tool === 'ap') {
         const snapped = computeSnap(raw, walls).point;
         applyOp((d) => addRadio(d, { levelId: level.id, position: [snapped[0], 2.0, snapped[1]] }));
+        return;
+      }
+
+      if (tool === 'zone') {
+        const snapped = computeSnap(raw, walls).point;
+        if (!draft || draft.kind !== 'zone-polygon') {
+          setDraft({ kind: 'zone-polygon', points: [snapped] });
+          return;
+        }
+        const first = draft.points[0]!;
+        const closeDist = Math.hypot(snapped[0] - first[0], snapped[1] - first[1]);
+        if (draft.points.length >= 3 && closeDist <= 0.25) {
+          applyOp((d) => addZone(d, { levelId: level.id, polygon: draft.points }));
+          setDraft(null);
+          return;
+        }
+        setDraft({ kind: 'zone-polygon', points: [...draft.points, snapped] });
         return;
       }
     },
@@ -290,23 +307,25 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
         );
       })}
 
-      {agents.map((agent) => (
-        <AgentMesh
-          key={agent.id}
-          agent={agent}
-          selected={selection === agent.id}
-          interactive={selectable}
-          opacity={opacity}
-          onSelect={select(agent.id)}
-        />
-      ))}
+      {(interactive || viewMode === '3d') &&
+        zones.map((zone) => (
+          <ZoneMesh
+            key={zone.id}
+            zone={zone}
+            polygon={zone.roomId !== undefined ? (doc.rooms.find((r) => r.id === zone.roomId)?.polygon ?? []) : zone.polygon}
+            selected={selection === zone.id}
+            interactive={selectable}
+            onSelect={select(zone.id)}
+          />
+        ))}
 
-      {interactive && hoverPoint && (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap') && (
+      {interactive && hoverPoint && (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap' || tool === 'zone') && (
         <SnapIndicator point={hoverPoint} snappedToEndpoint={computeSnap(hoverPoint, walls).snappedToEndpoint} />
       )}
 
       {interactive && draft?.kind === 'wall-chain' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
       {interactive && draft?.kind === 'room-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
+      {interactive && draft?.kind === 'zone-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
 
       {interactive && hoverWall && (tool === 'door' || tool === 'window') && (
         <OpeningPreview

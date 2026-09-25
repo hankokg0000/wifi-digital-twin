@@ -12,6 +12,7 @@ export function validateDoc(doc: SceneDoc): ValidationIssue[] {
   const levelIds = new Set(doc.levels.map((l) => l.id));
   const materialIds = new Set(doc.materials.map((m) => m.id));
   const wallIds = new Set(doc.walls.map((w) => w.id));
+  const roomIds = new Set(doc.rooms.map((r) => r.id));
 
   // --- global id uniqueness -----------------------------------------
   const allIds: Id[] = [
@@ -23,6 +24,9 @@ export function validateDoc(doc: SceneDoc): ValidationIssue[] {
     ...doc.objects.map((o) => o.id),
     ...doc.agents.map((a) => a.id),
     ...doc.radios.map((r) => r.id),
+    ...doc.stairs.map((s) => s.id),
+    ...doc.zones.map((z) => z.id),
+    ...doc.incidents.map((i) => i.id),
   ];
   const seen = new Set<Id>();
   for (const id of allIds) {
@@ -144,9 +148,6 @@ export function validateDoc(doc: SceneDoc): ValidationIssue[] {
   // --- agents -------------------------------------------------------------
   doc.agents.forEach((agent, i) => {
     const path = `agents[${i}]`;
-    if (!levelIds.has(agent.levelId)) {
-      issues.push(issue(path, `levelId "${agent.levelId}" does not resolve`));
-    }
     if (!materialIds.has(agent.materialId)) {
       issues.push(issue(path, `materialId "${agent.materialId}" does not resolve`));
     }
@@ -155,6 +156,43 @@ export function validateDoc(doc: SceneDoc): ValidationIssue[] {
     }
     if (!(agent.height > 0)) {
       issues.push(issue(path, 'height must be > 0'));
+    }
+    if (!(agent.speed > 0)) {
+      issues.push(issue(path, 'speed must be > 0'));
+    }
+    if (!levelIds.has(agent.start.levelId)) {
+      issues.push(issue(path, `start.levelId "${agent.start.levelId}" does not resolve`));
+    }
+    const behavior = agent.behavior;
+    if (behavior.type === 'route') {
+      if (behavior.waypoints.length < 1) {
+        issues.push(issue(path, 'route behavior must have >= 1 waypoint'));
+      }
+      behavior.waypoints.forEach((wp, j) => {
+        if (!levelIds.has(wp.levelId)) {
+          issues.push(issue(`${path}.behavior.waypoints[${j}]`, `levelId "${wp.levelId}" does not resolve`));
+        }
+      });
+    } else if (behavior.type === 'wander') {
+      if (!levelIds.has(behavior.levelId)) {
+        issues.push(issue(path, `behavior.levelId "${behavior.levelId}" does not resolve`));
+      }
+      if (behavior.roomId !== undefined) {
+        const room = doc.rooms.find((r) => r.id === behavior.roomId);
+        if (!room) {
+          issues.push(issue(path, `behavior.roomId "${behavior.roomId}" does not resolve`));
+        } else if (room.levelId !== behavior.levelId) {
+          issues.push(issue(path, `behavior.roomId "${behavior.roomId}" is not on behavior.levelId`));
+        }
+      }
+      if (!(behavior.pauseMin <= behavior.pauseMax)) {
+        issues.push(issue(path, 'behavior.pauseMin must be <= pauseMax'));
+      }
+    } else {
+      // roam
+      if (!(behavior.dwellMin <= behavior.dwellMax)) {
+        issues.push(issue(path, 'behavior.dwellMin must be <= dwellMax'));
+      }
     }
   });
 
@@ -175,6 +213,71 @@ export function validateDoc(doc: SceneDoc): ValidationIssue[] {
       bands.add(iface.band);
     }
   });
+
+  // --- stairs -------------------------------------------------------------
+  doc.stairs.forEach((stair, i) => {
+    const path = `stairs[${i}]`;
+    if (!levelIds.has(stair.fromLevelId)) {
+      issues.push(issue(path, `fromLevelId "${stair.fromLevelId}" does not resolve`));
+    }
+    if (!levelIds.has(stair.toLevelId)) {
+      issues.push(issue(path, `toLevelId "${stair.toLevelId}" does not resolve`));
+    }
+    if (stair.fromLevelId === stair.toLevelId) {
+      issues.push(issue(path, 'fromLevelId and toLevelId must differ'));
+    }
+    if (!(stair.width > 0)) {
+      issues.push(issue(path, 'width must be > 0'));
+    }
+  });
+
+  // --- zones -------------------------------------------------------------
+  doc.zones.forEach((zone, i) => {
+    const path = `zones[${i}]`;
+    if (!levelIds.has(zone.levelId)) {
+      issues.push(issue(path, `levelId "${zone.levelId}" does not resolve`));
+    }
+    if (zone.roomId !== undefined) {
+      if (!roomIds.has(zone.roomId)) {
+        issues.push(issue(path, `roomId "${zone.roomId}" does not resolve`));
+      } else {
+        const room = doc.rooms.find((r) => r.id === zone.roomId);
+        if (room && room.levelId !== zone.levelId) {
+          issues.push(issue(path, `roomId "${zone.roomId}" is not on levelId "${zone.levelId}"`));
+        }
+      }
+    } else if (zone.polygon.length < 3) {
+      issues.push(issue(path, 'zone polygon must have >= 3 points when roomId is not set'));
+    }
+  });
+
+  // --- incidents -------------------------------------------------------------
+  doc.incidents.forEach((incident, i) => {
+    const path = `incidents[${i}]`;
+    const agent = doc.agents.find((a) => a.id === incident.agentId);
+    if (!agent) {
+      issues.push(issue(path, `agentId "${incident.agentId}" does not resolve`));
+    } else if (agent.kind !== 'person') {
+      issues.push(issue(path, `agentId "${incident.agentId}" is not a person`));
+    }
+    if (!(incident.t >= 0)) {
+      issues.push(issue(path, 't must be >= 0'));
+    }
+    if (!(incident.duration > 0)) {
+      issues.push(issue(path, 'duration must be > 0'));
+    }
+  });
+
+  // --- population -------------------------------------------------------------
+  if (!(doc.population.people >= 0)) {
+    issues.push(issue('population', 'people must be >= 0'));
+  }
+  if (!(doc.population.pets >= 0)) {
+    issues.push(issue('population', 'pets must be >= 0'));
+  }
+  if (!(doc.population.fallsPerHour >= 0)) {
+    issues.push(issue('population', 'fallsPerHour must be >= 0'));
+  }
 
   // --- materials -------------------------------------------------------------
   doc.materials.forEach((material, i) => {

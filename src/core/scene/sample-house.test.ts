@@ -68,16 +68,40 @@ describe('sample-house', () => {
     expect(level2Walls.length).toBeGreaterThan(0);
   });
 
-  it('has at least one agent', () => {
-    expect(doc.agents.length).toBeGreaterThan(0);
+  it('has 4 agents (3 people, 1 pet)', () => {
+    expect(doc.agents.length).toBe(4);
+    expect(doc.agents.filter((a) => a.kind === 'person')).toHaveLength(3);
+    expect(doc.agents.filter((a) => a.kind === 'pet')).toHaveLength(1);
   });
 
-  it('agent has valid path', () => {
-    const agent = doc.agents[0];
-    expect(agent).toBeDefined();
-    expect(agent!.path.length).toBeGreaterThan(0);
-    expect(agent!.radius).toBeGreaterThan(0);
-    expect(agent!.height).toBeGreaterThan(0);
+  it('agents have valid spawn and behavior', () => {
+    for (const agent of doc.agents) {
+      expect(agent.radius).toBeGreaterThan(0);
+      expect(agent.height).toBeGreaterThan(0);
+      expect(agent.speed).toBeGreaterThan(0);
+      expect(agent.start.levelId).toBeTruthy();
+      // People roam the whole house at random; the pet wanders its spawn level (no fixed room).
+      if (agent.kind === 'person') {
+        expect(agent.behavior.type).toBe('roam');
+      } else {
+        expect(agent.behavior.type).toBe('wander');
+      }
+    }
+  });
+
+  it('has one explicit fall incident and the matching zones', () => {
+    expect(doc.incidents).toHaveLength(1);
+    expect(doc.incidents[0]!.kind).toBe('fall');
+    expect(doc.incidents[0]!.t).toBe(420);
+    expect(doc.incidents[0]!.duration).toBe(150);
+
+    expect(doc.zones.length).toBeGreaterThanOrEqual(3);
+    const kitchenZone = doc.zones.find((z) => z.roomId && doc.rooms.find((r) => r.id === z.roomId)?.name === 'ห้องครัว');
+    expect(kitchenZone?.appliesTo).toBe('pet');
+    const masterZone = doc.zones.find((z) => z.roomId && doc.rooms.find((r) => r.id === z.roomId)?.name === 'ห้องนอนใหญ่');
+    expect(masterZone?.appliesTo).toBe('person');
+    const frontDoorZone = doc.zones.find((z) => z.name === 'ประตูหน้า');
+    expect(frontDoorZone?.enabled).toBe(false);
   });
 
   it('has windows on exterior walls', () => {
@@ -115,7 +139,7 @@ describe('sample-house', () => {
     }
 
     for (const agent of doc.agents) {
-      expect(levelIds.has(agent.levelId)).toBe(true);
+      expect(levelIds.has(agent.start.levelId)).toBe(true);
       expect(materialIds.has(agent.materialId)).toBe(true);
     }
 

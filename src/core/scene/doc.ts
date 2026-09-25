@@ -6,9 +6,15 @@ import type {
   Room,
   SceneObject,
   Agent,
+  Waypoint,
+  AgentBehavior,
   RadioIface,
   Radio,
   Material,
+  Stair,
+  Zone,
+  Incident,
+  PopulationSettings,
   ValidationIssue,
 } from './types';
 import { DEFAULT_MATERIALS } from './materials';
@@ -38,6 +44,7 @@ export function createEmptyDoc(): SceneDoc {
   };
   return {
     version: 1,
+    seed: 1,
     materials,
     levels: [level],
     walls: [],
@@ -46,6 +53,10 @@ export function createEmptyDoc(): SceneDoc {
     objects: [],
     agents: [],
     radios: [],
+    stairs: [],
+    zones: [],
+    incidents: [],
+    population: { people: 0, pets: 0, fallsPerHour: 0 },
   };
 }
 
@@ -120,15 +131,45 @@ function orderedObject(o: SceneObject): SceneObject {
   };
 }
 
+function orderedWaypoint(wp: Waypoint): Waypoint {
+  return { levelId: wp.levelId, p: [wp.p[0], wp.p[1]], dwell: wp.dwell };
+}
+
+function orderedBehavior(b: AgentBehavior): AgentBehavior {
+  if (b.type === 'route') {
+    return { type: 'route', waypoints: b.waypoints.map(orderedWaypoint), loop: b.loop };
+  }
+  if (b.type === 'wander') {
+    return b.roomId === undefined
+      ? { type: 'wander', levelId: b.levelId, pauseMin: b.pauseMin, pauseMax: b.pauseMax }
+      : { type: 'wander', levelId: b.levelId, roomId: b.roomId, pauseMin: b.pauseMin, pauseMax: b.pauseMax };
+  }
+  return { type: 'roam', dwellMin: b.dwellMin, dwellMax: b.dwellMax };
+}
+
 function orderedAgent(a: Agent): Agent {
   return {
     id: a.id,
-    levelId: a.levelId,
+    name: a.name,
     kind: a.kind,
+    color: a.color,
     radius: a.radius,
     height: a.height,
-    path: a.path.map((wp) => ({ t: wp.t, p: [wp.p[0], wp.p[1]] as [number, number] })),
+    speed: a.speed,
     materialId: a.materialId,
+    start: orderedWaypoint(a.start),
+    behavior: orderedBehavior(a.behavior),
+  };
+}
+
+function orderedStair(s: Stair): Stair {
+  return {
+    id: s.id,
+    fromLevelId: s.fromLevelId,
+    toLevelId: s.toLevelId,
+    bottom: [s.bottom[0], s.bottom[1]],
+    top: [s.top[0], s.top[1]],
+    width: s.width,
   };
 }
 
@@ -148,10 +189,40 @@ function orderedRadio(r: Radio): Radio {
   };
 }
 
+function orderedZone(z: Zone): Zone {
+  return z.roomId === undefined
+    ? {
+        id: z.id,
+        name: z.name,
+        levelId: z.levelId,
+        polygon: z.polygon.map((p): [number, number] => [p[0], p[1]]),
+        appliesTo: z.appliesTo,
+        enabled: z.enabled,
+      }
+    : {
+        id: z.id,
+        name: z.name,
+        levelId: z.levelId,
+        roomId: z.roomId,
+        polygon: z.polygon.map((p): [number, number] => [p[0], p[1]]),
+        appliesTo: z.appliesTo,
+        enabled: z.enabled,
+      };
+}
+
+function orderedIncident(i: Incident): Incident {
+  return { id: i.id, kind: i.kind, agentId: i.agentId, t: i.t, duration: i.duration };
+}
+
+function orderedPopulation(p: PopulationSettings): PopulationSettings {
+  return { people: p.people, pets: p.pets, fallsPerHour: p.fallsPerHour };
+}
+
 /** Deterministic JSON serialization: fixed key order per type, doc-order arrays, trailing newline. */
 export function serialize(doc: SceneDoc): string {
   const ordered: SceneDoc = {
     version: 1,
+    seed: doc.seed,
     materials: doc.materials.map(orderedMaterial),
     levels: doc.levels.map(orderedLevel),
     walls: doc.walls.map(orderedWall),
@@ -160,6 +231,10 @@ export function serialize(doc: SceneDoc): string {
     objects: doc.objects.map(orderedObject),
     agents: doc.agents.map(orderedAgent),
     radios: doc.radios.map(orderedRadio),
+    stairs: doc.stairs.map(orderedStair),
+    zones: doc.zones.map(orderedZone),
+    incidents: doc.incidents.map(orderedIncident),
+    population: orderedPopulation(doc.population),
   };
   return JSON.stringify(ordered, null, 2) + '\n';
 }
@@ -218,6 +293,9 @@ export function parse(json: string): SceneDoc {
   if (d['version'] !== 1) {
     return fail('unsupported or missing "version" (expected 1)');
   }
+  if (!isFiniteNumber(d['seed'])) {
+    return fail('"seed" must be a finite number');
+  }
 
   const requiredArrays = [
     'materials',
@@ -228,11 +306,17 @@ export function parse(json: string): SceneDoc {
     'objects',
     'agents',
     'radios',
+    'stairs',
+    'zones',
+    'incidents',
   ] as const;
   for (const key of requiredArrays) {
     if (!Array.isArray(d[key])) {
       return fail(`"${key}" must be an array`);
     }
+  }
+  if (typeof d['population'] !== 'object' || d['population'] === null) {
+    return fail('"population" must be an object');
   }
 
   const materials = (d['materials'] as unknown[]).map((raw, i) => {
@@ -361,31 +445,69 @@ export function parse(json: string): SceneDoc {
     return out;
   });
 
+  function parseWaypoint(raw: unknown, path: string): Waypoint {
+    if (typeof raw !== 'object' || raw === null) return fail(`${path} must be an object`);
+    const wp = raw as Record<string, unknown>;
+    if (!isString(wp['levelId'])) return fail(`${path}.levelId must be a string`);
+    if (!isVec2(wp['p'])) return fail(`${path}.p must be a Vec2`);
+    if (!isFiniteNumber(wp['dwell'])) return fail(`${path}.dwell must be a finite number`);
+    return { levelId: wp['levelId'], p: wp['p'], dwell: wp['dwell'] };
+  }
+
   const agents = (d['agents'] as unknown[]).map((raw, i) => {
     if (typeof raw !== 'object' || raw === null) return fail(`agents[${i}] must be an object`);
     const a = raw as Record<string, unknown>;
     if (!isString(a['id'])) return fail(`agents[${i}].id must be a string`);
-    if (!isString(a['levelId'])) return fail(`agents[${i}].levelId must be a string`);
+    if (!isString(a['name'])) return fail(`agents[${i}].name must be a string`);
     if (a['kind'] !== 'person' && a['kind'] !== 'pet') return fail(`agents[${i}].kind must be "person" | "pet"`);
+    if (!isString(a['color'])) return fail(`agents[${i}].color must be a string`);
     if (!isFiniteNumber(a['radius'])) return fail(`agents[${i}].radius must be a finite number`);
     if (!isFiniteNumber(a['height'])) return fail(`agents[${i}].height must be a finite number`);
-    if (!Array.isArray(a['path'])) return fail(`agents[${i}].path must be an array`);
-    const path = a['path'].map((raw, j) => {
-      if (typeof raw !== 'object' || raw === null) return fail(`agents[${i}].path[${j}] must be an object`);
-      const wp = raw as Record<string, unknown>;
-      if (!isFiniteNumber(wp['t'])) return fail(`agents[${i}].path[${j}].t must be a finite number`);
-      if (!isVec2(wp['p'])) return fail(`agents[${i}].path[${j}].p must be a Vec2`);
-      return { t: wp['t'], p: wp['p'] };
-    });
+    if (!isFiniteNumber(a['speed'])) return fail(`agents[${i}].speed must be a finite number`);
     if (!isString(a['materialId'])) return fail(`agents[${i}].materialId must be a string`);
+    const start = parseWaypoint(a['start'], `agents[${i}].start`);
+
+    const rawBehavior = a['behavior'];
+    if (typeof rawBehavior !== 'object' || rawBehavior === null) {
+      return fail(`agents[${i}].behavior must be an object`);
+    }
+    const b = rawBehavior as Record<string, unknown>;
+    let behavior: AgentBehavior;
+    if (b['type'] === 'route') {
+      if (!Array.isArray(b['waypoints'])) return fail(`agents[${i}].behavior.waypoints must be an array`);
+      const waypoints = b['waypoints'].map((raw, j) => parseWaypoint(raw, `agents[${i}].behavior.waypoints[${j}]`));
+      if (!isBoolean(b['loop'])) return fail(`agents[${i}].behavior.loop must be a boolean`);
+      behavior = { type: 'route', waypoints, loop: b['loop'] };
+    } else if (b['type'] === 'wander') {
+      if (!isString(b['levelId'])) return fail(`agents[${i}].behavior.levelId must be a string`);
+      if (b['roomId'] !== undefined && !isString(b['roomId'])) {
+        return fail(`agents[${i}].behavior.roomId must be a string when present`);
+      }
+      if (!isFiniteNumber(b['pauseMin'])) return fail(`agents[${i}].behavior.pauseMin must be a finite number`);
+      if (!isFiniteNumber(b['pauseMax'])) return fail(`agents[${i}].behavior.pauseMax must be a finite number`);
+      behavior =
+        b['roomId'] === undefined
+          ? { type: 'wander', levelId: b['levelId'], pauseMin: b['pauseMin'], pauseMax: b['pauseMax'] }
+          : { type: 'wander', levelId: b['levelId'], roomId: b['roomId'], pauseMin: b['pauseMin'], pauseMax: b['pauseMax'] };
+    } else if (b['type'] === 'roam') {
+      if (!isFiniteNumber(b['dwellMin'])) return fail(`agents[${i}].behavior.dwellMin must be a finite number`);
+      if (!isFiniteNumber(b['dwellMax'])) return fail(`agents[${i}].behavior.dwellMax must be a finite number`);
+      behavior = { type: 'roam', dwellMin: b['dwellMin'], dwellMax: b['dwellMax'] };
+    } else {
+      return fail(`agents[${i}].behavior.type must be "route" | "wander" | "roam"`);
+    }
+
     const out: Agent = {
       id: a['id'],
-      levelId: a['levelId'],
+      name: a['name'],
       kind: a['kind'],
+      color: a['color'],
       radius: a['radius'],
       height: a['height'],
-      path,
+      speed: a['speed'],
       materialId: a['materialId'],
+      start,
+      behavior,
     };
     return out;
   });
@@ -423,7 +545,90 @@ export function parse(json: string): SceneDoc {
     return out;
   });
 
-  const doc: SceneDoc = { version: 1, materials, levels, walls, openings, rooms, objects, agents, radios };
+  const stairs = (d['stairs'] as unknown[]).map((raw, i) => {
+    if (typeof raw !== 'object' || raw === null) return fail(`stairs[${i}] must be an object`);
+    const s = raw as Record<string, unknown>;
+    if (!isString(s['id'])) return fail(`stairs[${i}].id must be a string`);
+    if (!isString(s['fromLevelId'])) return fail(`stairs[${i}].fromLevelId must be a string`);
+    if (!isString(s['toLevelId'])) return fail(`stairs[${i}].toLevelId must be a string`);
+    if (!isVec2(s['bottom'])) return fail(`stairs[${i}].bottom must be a Vec2`);
+    if (!isVec2(s['top'])) return fail(`stairs[${i}].top must be a Vec2`);
+    if (!isFiniteNumber(s['width'])) return fail(`stairs[${i}].width must be a finite number`);
+    const out: Stair = {
+      id: s['id'],
+      fromLevelId: s['fromLevelId'],
+      toLevelId: s['toLevelId'],
+      bottom: s['bottom'],
+      top: s['top'],
+      width: s['width'],
+    };
+    return out;
+  });
+
+  const zones = (d['zones'] as unknown[]).map((raw, i) => {
+    if (typeof raw !== 'object' || raw === null) return fail(`zones[${i}] must be an object`);
+    const z = raw as Record<string, unknown>;
+    if (!isString(z['id'])) return fail(`zones[${i}].id must be a string`);
+    if (!isString(z['name'])) return fail(`zones[${i}].name must be a string`);
+    if (!isString(z['levelId'])) return fail(`zones[${i}].levelId must be a string`);
+    if (z['roomId'] !== undefined && !isString(z['roomId'])) return fail(`zones[${i}].roomId must be a string when present`);
+    if (!Array.isArray(z['polygon']) || !z['polygon'].every(isVec2)) {
+      return fail(`zones[${i}].polygon must be an array of Vec2`);
+    }
+    if (z['appliesTo'] !== 'person' && z['appliesTo'] !== 'pet' && z['appliesTo'] !== 'any') {
+      return fail(`zones[${i}].appliesTo must be "person" | "pet" | "any"`);
+    }
+    if (!isBoolean(z['enabled'])) return fail(`zones[${i}].enabled must be a boolean`);
+    const out: Zone = {
+      id: z['id'],
+      name: z['name'],
+      levelId: z['levelId'],
+      ...(z['roomId'] !== undefined ? { roomId: z['roomId'] as string } : {}),
+      polygon: z['polygon'] as [number, number][],
+      appliesTo: z['appliesTo'],
+      enabled: z['enabled'],
+    };
+    return out;
+  });
+
+  const incidents = (d['incidents'] as unknown[]).map((raw, i) => {
+    if (typeof raw !== 'object' || raw === null) return fail(`incidents[${i}] must be an object`);
+    const inc = raw as Record<string, unknown>;
+    if (!isString(inc['id'])) return fail(`incidents[${i}].id must be a string`);
+    if (inc['kind'] !== 'fall') return fail(`incidents[${i}].kind must be "fall"`);
+    if (!isString(inc['agentId'])) return fail(`incidents[${i}].agentId must be a string`);
+    if (!isFiniteNumber(inc['t'])) return fail(`incidents[${i}].t must be a finite number`);
+    if (!isFiniteNumber(inc['duration'])) return fail(`incidents[${i}].duration must be a finite number`);
+    const out: Incident = { id: inc['id'], kind: inc['kind'], agentId: inc['agentId'], t: inc['t'], duration: inc['duration'] };
+    return out;
+  });
+
+  const rawPopulation = d['population'] as Record<string, unknown>;
+  if (!isFiniteNumber(rawPopulation['people'])) return fail('population.people must be a finite number');
+  if (!isFiniteNumber(rawPopulation['pets'])) return fail('population.pets must be a finite number');
+  if (!isFiniteNumber(rawPopulation['fallsPerHour'])) return fail('population.fallsPerHour must be a finite number');
+  const population: PopulationSettings = {
+    people: rawPopulation['people'],
+    pets: rawPopulation['pets'],
+    fallsPerHour: rawPopulation['fallsPerHour'],
+  };
+
+  const doc: SceneDoc = {
+    version: 1,
+    seed: d['seed'] as number,
+    materials,
+    levels,
+    walls,
+    openings,
+    rooms,
+    objects,
+    agents,
+    radios,
+    stairs,
+    zones,
+    incidents,
+    population,
+  };
 
   const issues = validateDoc(doc);
   if (issues.length > 0) {

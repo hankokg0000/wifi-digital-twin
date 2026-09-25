@@ -9,6 +9,9 @@ test('sample house starts on the ground floor', async ({ app: page }) => {
 test('add a level, draw on it, then remove it with its contents', async ({ app: page }) => {
   const before = await snapshot(page);
 
+  // The left panel now opens on the "จำลอง" (Sim) tab by default (design brief §3) — switch to
+  // Levels first.
+  await page.getByRole('button', { name: 'Levels', exact: true }).click();
   await page.getByTitle('Add level').click();
   const added = await snapshot(page);
   expect(added.doc.levels).toHaveLength(3);
@@ -42,5 +45,6 @@ test('the last remaining level cannot be removed', async ({ app: page }) => {
   await page.getByRole('button', { name: 'New', exact: true }).click();
 
   expect((await snapshot(page)).doc.levels).toHaveLength(1);
+  await page.getByRole('button', { name: 'Levels', exact: true }).click();
   await expect(page.getByTitle('Remove level')).toBeDisabled();
 });

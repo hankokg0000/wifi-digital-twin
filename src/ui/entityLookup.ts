@@ -9,6 +9,8 @@ export type FoundEntity =
   | { kind: 'agent'; index: number }
   | { kind: 'radio'; index: number }
   | { kind: 'material'; index: number }
+  | { kind: 'stair'; index: number }
+  | { kind: 'zone'; index: number }
   | null;
 
 /** Find which collection an id belongs to and its index, or null if not found. */
@@ -29,6 +31,10 @@ export function findEntity(doc: SceneDoc, id: Id): FoundEntity {
   if (i >= 0) return { kind: 'radio', index: i };
   i = doc.materials.findIndex((x) => x.id === id);
   if (i >= 0) return { kind: 'material', index: i };
+  i = doc.stairs.findIndex((x) => x.id === id);
+  if (i >= 0) return { kind: 'stair', index: i };
+  i = doc.zones.findIndex((x) => x.id === id);
+  if (i >= 0) return { kind: 'zone', index: i };
   return null;
 }
 
@@ -41,4 +47,6 @@ export const KIND_LABEL: Record<EntityKind, string> = {
   agent: 'Agent',
   radio: 'Radio',
   material: 'Material',
+  stair: 'Stair',
+  zone: 'Zone',
 };

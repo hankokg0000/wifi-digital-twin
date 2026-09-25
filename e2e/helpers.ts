@@ -14,7 +14,8 @@ export interface Snapshot {
     rooms: { id: string; levelId: string; name: string; polygon: Vec2[]; cameraAllowed: boolean }[];
     objects: { id: string; levelId: string; position: [number, number, number]; size: [number, number, number]; rotationY: number }[];
     radios: { id: string; levelId: string; role: string; position: [number, number, number]; ifaces: { band: string; channel: number; txPowerDbm: number }[] }[];
-    agents: { id: string; levelId: string }[];
+    agents: { id: string; name: string; kind: 'person' | 'pet'; start: { levelId: string; p: Vec2; dwell: number } }[];
+    stairs: { id: string; fromLevelId: string; toLevelId: string; bottom: Vec2; top: Vec2; width: number }[];
     materials: { id: string; name: string; lossDb: Record<string, number> }[];
   };
   pastLength: number;

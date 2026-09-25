@@ -7,10 +7,18 @@ import {
   updateObject,
   updateRadio,
   updateLevel,
+  updateAgent,
+  updateStair,
+  updateZone,
+  setRoomRestricted,
+  addIncident,
+  pointInPolygon,
+  sampleAgent,
   type Band,
   type RadioIface,
 } from '../../core';
 import { useSceneStore } from '../store';
+import { useSimPlans } from '../useSimPlans';
 import { findEntity, KIND_LABEL } from '../entityLookup';
 
 function num(e: ChangeEvent<HTMLInputElement>): number {
@@ -22,6 +30,8 @@ export function Inspector() {
   const selection = useSceneStore((s) => s.selection);
   const apply = useSceneStore((s) => s.apply);
   const setSelection = useSceneStore((s) => s.setSelection);
+  const simT = useSceneStore((s) => s.sim.t);
+  const plans = useSimPlans();
 
   if (!selection) {
     return (
@@ -112,6 +122,7 @@ export function Inspector() {
     );
   } else if (found.kind === 'room') {
     const room = doc.rooms[found.index]!;
+    const restrictedZone = doc.zones.find((z) => z.roomId === room.id);
     body = (
       <>
         <Field label="Name">
@@ -123,6 +134,25 @@ export function Inspector() {
         <Field label="Points">
           <span className="readonly-value">{room.polygon.length}</span>
         </Field>
+        <Field label="พื้นที่ห้ามเข้า">
+          <input
+            type="checkbox"
+            checked={!!restrictedZone}
+            onChange={(e) => apply((d) => setRoomRestricted(d, room.id, e.target.checked, restrictedZone?.appliesTo ?? 'any'))}
+          />
+        </Field>
+        {restrictedZone && (
+          <Field label="ใช้กับ">
+            <select
+              value={restrictedZone.appliesTo}
+              onChange={(e) => apply((d) => setRoomRestricted(d, room.id, true, e.target.value as 'person' | 'pet' | 'any'))}
+            >
+              <option value="person">คน</option>
+              <option value="pet">สัตว์</option>
+              <option value="any">ทั้งหมด</option>
+            </select>
+          </Field>
+        )}
       </>
     );
   } else if (found.kind === 'object') {
@@ -237,21 +267,102 @@ export function Inspector() {
     );
   } else if (found.kind === 'agent') {
     const agent = doc.agents[found.index]!;
+    const warnings = plans.get(agent.id)?.warnings ?? [];
+    const segments = plans.get(agent.id)?.segments;
+    const state = segments && segments.length > 0 ? sampleAgent(doc, segments, simT) : null;
+    const postureLabel = state?.posture === 'fallen' ? 'ล้มอยู่' : state?.posture === 'walking' ? 'กำลังเดิน' : 'ยืนอยู่';
+    const currentRoom = state
+      ? doc.rooms.find((r) => r.levelId === state.levelId && pointInPolygon([state.position[0], state.position[2]], r.polygon))
+      : undefined;
     body = (
       <>
+        <Field label="Name">
+          <input value={agent.name} onChange={(e) => apply((d) => updateAgent(d, agent.id, { name: e.target.value }))} />
+        </Field>
+        <Field label="Color">
+          <input type="color" value={agent.color} onChange={(e) => apply((d) => updateAgent(d, agent.id, { color: e.target.value }))} />
+        </Field>
         <Field label="Kind">
-          <span className="readonly-value">{agent.kind}</span>
+          <span className="readonly-value">{agent.kind === 'person' ? 'คน' : 'สัตว์เลี้ยง'}</span>
         </Field>
-        <Field label="Radius (m)">
-          <span className="readonly-value">{agent.radius}</span>
+        <Field label="ท่าทางปัจจุบัน">
+          <span className={`readonly-value${state?.posture === 'fallen' ? ' text-danger' : ''}`}>{postureLabel}</span>
         </Field>
-        <Field label="Height (m)">
-          <span className="readonly-value">{agent.height}</span>
+        <Field label="อยู่ที่ห้อง">
+          <span className="readonly-value">{currentRoom?.name ?? '—'}</span>
         </Field>
-        <Field label="Waypoints">
-          <span className="readonly-value">{agent.path.length}</span>
+
+        {agent.kind === 'person' && (
+          <div className="field-block">
+            <button
+              className="toolbar-btn"
+              onClick={() => apply((d) => addIncident(d, { agentId: agent.id, t: simT, duration: 180 }).doc)}
+            >
+              จำลองล้มตอนนี้
+            </button>
+          </div>
+        )}
+
+        {warnings.length > 0 && (
+          <div className="field-block">
+            <span className="field-label">Planning warnings</span>
+            <ul className="warning-list">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </>
+    );
+  } else if (found.kind === 'zone') {
+    const zone = doc.zones[found.index]!;
+    body = (
+      <>
+        <Field label="Name">
+          <input value={zone.name} onChange={(e) => apply((d) => updateZone(d, zone.id, { name: e.target.value }))} />
         </Field>
-        <p className="empty-hint">Agents aren&apos;t editable in the UI yet.</p>
+        <Field label="ใช้กับ">
+          <select
+            value={zone.appliesTo}
+            onChange={(e) => apply((d) => updateZone(d, zone.id, { appliesTo: e.target.value as typeof zone.appliesTo }))}
+          >
+            <option value="person">คน</option>
+            <option value="pet">สัตว์</option>
+            <option value="any">ทั้งหมด</option>
+          </select>
+        </Field>
+        <Field label="เปิดใช้งาน">
+          <input type="checkbox" checked={zone.enabled} onChange={(e) => apply((d) => updateZone(d, zone.id, { enabled: e.target.checked }))} />
+        </Field>
+        {zone.roomId && (
+          <Field label="ห้อง">
+            <span className="readonly-value">{doc.rooms.find((r) => r.id === zone.roomId)?.name ?? zone.roomId}</span>
+          </Field>
+        )}
+      </>
+    );
+  } else if (found.kind === 'stair') {
+    const stair = doc.stairs[found.index]!;
+    const fromLevel = doc.levels.find((l) => l.id === stair.fromLevelId);
+    const toLevel = doc.levels.find((l) => l.id === stair.toLevelId);
+    body = (
+      <>
+        <Field label="From level">
+          <span className="readonly-value">{fromLevel?.name ?? stair.fromLevelId}</span>
+        </Field>
+        <Field label="To level">
+          <span className="readonly-value">{toLevel?.name ?? stair.toLevelId}</span>
+        </Field>
+        <Field label="Bottom (x, z)">
+          <Vec2Input value={stair.bottom} onChange={(v) => apply((d) => updateStair(d, stair.id, { bottom: v }))} />
+        </Field>
+        <Field label="Top (x, z)">
+          <Vec2Input value={stair.top} onChange={(v) => apply((d) => updateStair(d, stair.id, { top: v }))} />
+        </Field>
+        <Field label="Width (m)">
+          <input type="number" step={0.1} min={0.1} value={stair.width} onChange={(e) => apply((d) => updateStair(d, stair.id, { width: num(e) }))} />
+        </Field>
       </>
     );
   } else if (found.kind === 'material') {
@@ -277,6 +388,26 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="field-label">{label}</span>
       {children}
     </label>
+  );
+}
+
+function Vec2Input({ value, onChange }: { value: [number, number]; onChange: (v: [number, number]) => void }) {
+  return (
+    <div className="vec3-input">
+      {[0, 1].map((i) => (
+        <input
+          key={i}
+          type="number"
+          step={0.05}
+          value={value[i]}
+          onChange={(e) => {
+            const v: [number, number] = [...value];
+            v[i] = Number(e.target.value);
+            onChange(v);
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

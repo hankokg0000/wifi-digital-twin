@@ -361,6 +361,13 @@ select {
   color: var(--text-dim);
 }
 
+.warning-list {
+  margin: 0;
+  padding-left: 16px;
+  color: #e0a04a;
+  font-size: 11px;
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
@@ -460,4 +467,319 @@ select {
   white-space: nowrap;
   pointer-events: none;
   user-select: none;
+}
+
+.zone-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  visibility: hidden;
+  color: #ffd7da;
+  font-size: 10px;
+  background: rgba(58, 15, 18, 0.75);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.entity-label.label-fallen {
+  color: #ffd7da;
+  background: rgba(58, 15, 18, 0.85);
+  font-weight: 600;
+}
+
+.waypoint-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  visibility: hidden;
+  color: #0b1a24;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- Sim bar ---------- */
+
+.sim-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(27, 31, 36, 0.92);
+  border-top: 1px solid var(--panel-border);
+  z-index: 15;
+}
+
+.sim-bar-clock {
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  color: var(--text-dim);
+}
+
+.sim-bar-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-bar-speeds {
+  display: flex;
+  gap: 2px;
+}
+
+.sim-bar-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  max-width: 32vw;
+}
+
+.sim-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 3px 9px 3px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.sim-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.sim-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sim-chip-room {
+  color: var(--text-dim);
+}
+
+.sim-bar-slider-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.sim-bar-slider-wrap .sim-bar-slider {
+  width: 100%;
+}
+
+.sim-bar-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0;
+  pointer-events: none;
+}
+
+.sim-bar-tick {
+  position: absolute;
+  top: -9px;
+  width: 2px;
+  height: 8px;
+  background: #e0a04a;
+  transform: translateX(-1px);
+}
+
+.sim-bar-tick.critical {
+  background: var(--danger);
+  height: 10px;
+  top: -10px;
+}
+
+/* ---------- Right column (Alerts + Inspector) ---------- */
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-panel .inspector {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- Alerts panel ---------- */
+
+.alerts-panel {
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.alerts-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+}
+
+.alerts-panel-badge {
+  background: var(--accent-dim);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.alerts-panel-collapse {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+.alerts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 6px;
+  overflow-y: auto;
+}
+
+.alert-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 4px 6px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.alert-item:hover {
+  background: var(--row-hover);
+}
+
+.alert-item.alert-critical {
+  color: #ffb3b8;
+}
+
+.alert-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  flex: none;
+}
+
+.alert-message {
+  flex: 1;
+}
+
+/* ---------- Alert toasts (canvas overlay) ---------- */
+
+.alert-toasts {
+  position: absolute;
+  right: 12px;
+  bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 40;
+  max-width: 320px;
+}
+
+.alert-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #24303a;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.alert-toast-critical {
+  background: #3a1f22;
+  border-color: var(--danger);
+  color: #ffd7da;
+}
+
+.alert-toast-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  margin-left: auto;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ---------- Population (Sim) tab ---------- */
+
+.stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.stepper-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper-value {
+  min-width: 18px;
+  text-align: center;
+}
+
+.segmented-control {
+  display: flex;
+  gap: 4px;
+}
+
+.sim-tab-primary {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.text-danger {
+  color: var(--danger);
 }

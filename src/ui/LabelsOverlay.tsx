@@ -51,15 +51,45 @@ function LabelDiv({ id, className, world, children }: LabelDivProps) {
 export function LabelsOverlay() {
   const doc = useSceneStore((s) => s.doc);
   const activeLevelId = useSceneStore((s) => s.activeLevelId);
+  const selection = useSceneStore((s) => s.selection);
 
   const level = doc.levels.find((l) => l.id === activeLevelId);
   if (!level) return null;
 
   const rooms = doc.rooms.filter((r) => r.levelId === level.id);
   const radios = doc.radios.filter((r) => r.levelId === level.id);
+  const zones = doc.zones.filter((z) => z.levelId === level.id);
+
+  const selectedAgent = doc.agents.find((a) => a.id === selection);
+  const waypointsOnLevel =
+    selectedAgent && selectedAgent.behavior.type === 'route'
+      ? selectedAgent.behavior.waypoints
+          .map((wp, i) => ({ wp, i }))
+          .filter(({ wp }) => wp.levelId === level.id)
+      : [];
 
   return (
     <div className="labels-overlay">
+      {/* Agent name labels: world position is only a mount-time placeholder — AgentsLayer
+          (inside <Canvas>) overrides it every simulation frame via updateLabelWorld. */}
+      {doc.agents.map((agent) => {
+        const startLevel = doc.levels.find((l) => l.id === agent.start.levelId);
+        return (
+          <LabelDiv
+            key={agent.id}
+            id={`agent:${agent.id}`}
+            className="entity-label"
+            world={[agent.start.p[0], (startLevel?.elevation ?? 0) + agent.height + 0.15, agent.start.p[1]]}
+          >
+            {agent.name}
+          </LabelDiv>
+        );
+      })}
+      {waypointsOnLevel.map(({ wp, i }) => (
+        <LabelDiv key={`wp:${selectedAgent!.id}:${i}`} id={`waypoint:${selectedAgent!.id}:${i}`} className="waypoint-label" world={[wp.p[0], level.elevation + 0.06, wp.p[1]]}>
+          {i + 1}
+        </LabelDiv>
+      ))}
       {rooms.map((room) => {
         const [cx, cz] = centroid(room.polygon);
         return (
@@ -71,6 +101,17 @@ export function LabelsOverlay() {
                 🔒
               </span>
             )}
+          </LabelDiv>
+        );
+      })}
+      {zones.map((zone) => {
+        const room = zone.roomId !== undefined ? doc.rooms.find((r) => r.id === zone.roomId) : undefined;
+        const polygon = room ? room.polygon : zone.polygon;
+        if (polygon.length < 3) return null;
+        const [cx, cz] = centroid(polygon);
+        return (
+          <LabelDiv key={zone.id} id={`zone:${zone.id}`} className="zone-label" world={[cx, level.elevation + 0.08, cz]}>
+            {zone.name}
           </LabelDiv>
         );
       })}

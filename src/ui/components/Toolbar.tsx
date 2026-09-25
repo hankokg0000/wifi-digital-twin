@@ -11,6 +11,7 @@ const TOOLS: { tool: Tool; label: string; shortcut: string }[] = [
   { tool: 'room', label: 'Room', shortcut: 'R' },
   { tool: 'object', label: 'Object', shortcut: 'O' },
   { tool: 'ap', label: 'AP', shortcut: 'A' },
+  { tool: 'zone', label: 'Zone', shortcut: 'Z' },
 ];
 
 export function Toolbar() {

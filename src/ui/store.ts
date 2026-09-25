@@ -2,13 +2,22 @@ import { create } from 'zustand';
 import type { SceneDoc, Id, Vec2 } from '../core';
 import { sampleHouse, createEmptyDoc, SceneOpError, SceneParseError, serialize, parse } from '../core';
 import { findEntity } from './entityLookup';
+import { SIM_HORIZON_SECONDS, simClockRef } from './simClock';
 
-export type Tool = 'select' | 'wall' | 'door' | 'window' | 'room' | 'object' | 'ap';
+export type Tool = 'select' | 'wall' | 'door' | 'window' | 'room' | 'object' | 'ap' | 'zone';
 export type ViewMode = 'plan' | '3d';
+export type SimSpeed = 1 | 5 | 20 | 60;
+
+export interface SimState {
+  t: number;
+  playing: boolean;
+  speed: SimSpeed;
+}
 
 export type Draft =
   | { kind: 'wall-chain'; points: Vec2[] }
   | { kind: 'room-polygon'; points: Vec2[] }
+  | { kind: 'zone-polygon'; points: Vec2[] }
   | null;
 
 const HISTORY_CAP = 100;
@@ -60,6 +69,12 @@ interface SceneState {
    */
   cameraLocked: boolean;
 
+  /**
+   * Simulation playback state. Deliberately NOT part of `doc` (not undo-tracked, not
+   * autosaved) — it's a view over the deterministic plan, not editable document state.
+   */
+  sim: SimState;
+
   apply: (fn: (d: SceneDoc) => SceneDoc) => void;
   /** Like `apply`, but for creation ops that return {doc, id}; auto-selects the new entity. */
   applyOp: (fn: (d: SceneDoc) => { doc: SceneDoc; id: Id }) => Id | null;
@@ -81,6 +96,13 @@ interface SceneState {
   clearDraft: () => void;
   dismissError: () => void;
   setCameraLocked: (locked: boolean) => void;
+
+  play: () => void;
+  pause: () => void;
+  toggle: () => void;
+  setSpeed: (speed: SimSpeed) => void;
+  setTime: (t: number) => void;
+  resetTime: () => void;
 }
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -108,6 +130,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   draft: null,
   lastError: null,
   cameraLocked: false,
+  sim: { t: 0, playing: false, speed: 1 },
 
   apply: (fn) => {
     const { doc, past } = get();
@@ -216,6 +239,23 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   clearDraft: () => set({ draft: null }),
   dismissError: () => set({ lastError: null }),
   setCameraLocked: (locked) => set({ cameraLocked: locked }),
+
+  // --- Simulation playback: plain `set`s, never `apply`/`applyOp` — not undo-tracked, not
+  // autosaved. `simClockRef.t` (read every frame by SimClock/AgentsLayer, outside React) is
+  // kept in lockstep here so scrubbing/reset take effect immediately, not on the next frame.
+  play: () => set((s) => ({ sim: { ...s.sim, playing: true } })),
+  pause: () => set((s) => ({ sim: { ...s.sim, playing: false } })),
+  toggle: () => set((s) => ({ sim: { ...s.sim, playing: !s.sim.playing } })),
+  setSpeed: (speed) => set((s) => ({ sim: { ...s.sim, speed } })),
+  setTime: (t) => {
+    const clamped = Math.min(Math.max(t, 0), SIM_HORIZON_SECONDS);
+    simClockRef.t = clamped;
+    set((s) => ({ sim: { ...s.sim, t: clamped } }));
+  },
+  resetTime: () => {
+    simClockRef.t = 0;
+    set((s) => ({ sim: { ...s.sim, t: 0, playing: false } }));
+  },
 }));
 
 // Dev-only hook so E2E tests can read and drive editor state without pixel-peeping the canvas.

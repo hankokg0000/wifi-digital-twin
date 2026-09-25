@@ -60,14 +60,63 @@ export interface SceneObject {
   materialId: Id;
 }
 
+export interface Waypoint {
+  levelId: Id;
+  p: Vec2;
+  dwell: number; // seconds to idle at arrival
+}
+
+export type AgentBehavior =
+  | { type: 'route'; waypoints: Waypoint[]; loop: boolean }
+  // roomId undefined = wander anywhere on the level (not restricted to one room).
+  | { type: 'wander'; levelId: Id; roomId?: Id; pauseMin: number; pauseMax: number }
+  // person: random rooms on any level (uses stairs); the UI's population generator authors this.
+  | { type: 'roam'; dwellMin: number; dwellMax: number };
+
 export interface Agent {
   id: Id;
-  levelId: Id;
+  name: string;
   kind: 'person' | 'pet';
-  radius: number; // person ~= 0.2
-  height: number; // person ~= 1.7
-  path: { t: number; p: Vec2 }[]; // waypoints over time, loop
-  materialId: Id; // 'human-body'
+  color: string; // render color
+  radius: number; // person 0.2, pet 0.15
+  height: number; // person 1.7, pet 0.35
+  speed: number; // m/s — person 1.2, pet 0.8
+  materialId: Id; // 'human-body' (pets too for now)
+  start: Waypoint; // spawn location at t = 0 (levelId + p; dwell = initial idle seconds)
+  behavior: AgentBehavior;
+}
+
+export interface Zone {
+  id: Id;
+  name: string;
+  levelId: Id;
+  roomId?: Id; // if set, the polygon follows that room's polygon (ignore `polygon`)
+  polygon: Vec2[]; // used when roomId is undefined
+  appliesTo: 'person' | 'pet' | 'any';
+  enabled: boolean;
+}
+
+export interface Incident {
+  id: Id;
+  kind: 'fall';
+  agentId: Id;
+  t: number; // s, when it happens
+  duration: number; // s the agent lies down for
+}
+
+export interface PopulationSettings {
+  people: number;
+  pets: number;
+  fallsPerHour: number;
+}
+
+export interface Stair {
+  id: Id;
+  fromLevelId: Id; // lower level
+  toLevelId: Id; // upper level
+  bottom: Vec2; // landing point on the lower level floor
+  top: Vec2; // landing point on the upper level floor
+  width: number; // m, ~1.0
 }
 
 export interface RadioIface {
@@ -88,6 +137,7 @@ export interface Radio {
 
 export interface SceneDoc {
   version: 1;
+  seed: number; // deterministic simulation seed, default 1
   materials: Material[];
   levels: Level[];
   walls: Wall[];
@@ -96,6 +146,10 @@ export interface SceneDoc {
   objects: SceneObject[];
   agents: Agent[];
   radios: Radio[];
+  stairs: Stair[];
+  zones: Zone[];
+  incidents: Incident[];
+  population: PopulationSettings;
 }
 
 export type EntityKind =
@@ -106,7 +160,9 @@ export type EntityKind =
   | 'object'
   | 'agent'
   | 'radio'
-  | 'material';
+  | 'material'
+  | 'stair'
+  | 'zone';
 
 export interface ValidationIssue {
   path: string;

@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { addLevel, removeLevel, updateLevel, updateMaterial, type Band } from '../../core';
+import { addLevel, removeLevel, updateLevel, updateMaterial, updateZone, addIncident, populate, type Band, type PopulationSettings } from '../../core';
 import { useSceneStore } from '../store';
 import { KIND_LABEL } from '../entityLookup';
 
-type Tab = 'levels' | 'materials';
+type Tab = 'sim' | 'levels' | 'materials';
 
 export function LeftPanel() {
-  const [tab, setTab] = useState<Tab>('levels');
+  // "จำลอง" (Sim) opens by default — this is the tab the demo is built around (design brief §3).
+  const [tab, setTab] = useState<Tab>('sim');
 
   return (
     <div className="left-panel">
       <div className="tabs">
+        <button className={`tab-btn${tab === 'sim' ? ' active' : ''}`} onClick={() => setTab('sim')}>
+          จำลอง
+        </button>
         <button className={`tab-btn${tab === 'levels' ? ' active' : ''}`} onClick={() => setTab('levels')}>
           Levels
         </button>
@@ -18,7 +22,125 @@ export function LeftPanel() {
           Materials
         </button>
       </div>
-      {tab === 'levels' ? <LevelsTab /> : <MaterialsTab />}
+      {tab === 'sim' ? <SimTab /> : tab === 'levels' ? <LevelsTab /> : <MaterialsTab />}
+    </div>
+  );
+}
+
+const APPLIES_TO_LABEL = { person: 'คน', pet: 'สัตว์', any: 'ทั้งหมด' } as const;
+const FALLS_PER_HOUR_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'ปิด' },
+  { value: 0.5, label: 'ต่ำ (0.5/ชม.)' },
+  { value: 3, label: 'สูง (3/ชม.)' },
+];
+
+function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <div className="stepper-row">
+      <span className="field-label">{label}</span>
+      <div className="stepper-controls">
+        <button className="small-btn" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+          −
+        </button>
+        <span className="stepper-value">{value}</span>
+        <button className="small-btn" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SimTab() {
+  const doc = useSceneStore((s) => s.doc);
+  const selection = useSceneStore((s) => s.selection);
+  const simT = useSceneStore((s) => s.sim.t);
+  const apply = useSceneStore((s) => s.apply);
+  const setTime = useSceneStore((s) => s.setTime);
+  const play = useSceneStore((s) => s.play);
+  const setSelection = useSceneStore((s) => s.setSelection);
+
+  const [settings, setSettings] = useState<PopulationSettings>(doc.population);
+
+  function randomize() {
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    apply((d) => populate(d, settings, seed));
+    setTime(0);
+    play();
+  }
+
+  function simulateFallNow() {
+    const people = doc.agents.filter((a) => a.kind === 'person');
+    if (people.length === 0) return;
+    const selected = people.find((p) => p.id === selection);
+    const target = selected ?? people[Math.floor(Math.random() * people.length)]!;
+    apply((d) => addIncident(d, { agentId: target.id, t: simT, duration: 180 }).doc);
+    // Don't touch selection/level here — falling doesn't imply the user wants to jump to them;
+    // the alerts panel/toast already offers a one-click way to do that once the fall fires.
+  }
+
+  return (
+    <div className="panel-body">
+      <div className="panel-section">
+        <div className="panel-section-header">
+          <span>ประชากรจำลอง</span>
+        </div>
+        <Stepper label="คน" value={settings.people} min={0} max={12} onChange={(people) => setSettings((s) => ({ ...s, people }))} />
+        <Stepper label="สัตว์เลี้ยง" value={settings.pets} min={0} max={6} onChange={(pets) => setSettings((s) => ({ ...s, pets }))} />
+        <div className="field-block">
+          <span className="field-label">โอกาสล้ม</span>
+          <div className="segmented-control">
+            {FALLS_PER_HOUR_OPTIONS.map((opt) => (
+              <button
+                key={opt.label}
+                className={`toolbar-btn${settings.fallsPerHour === opt.value ? ' active' : ''}`}
+                onClick={() => setSettings((s) => ({ ...s, fallsPerHour: opt.value }))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button className="toolbar-btn sim-tab-primary" onClick={randomize}>
+          สุ่มใหม่
+        </button>
+      </div>
+
+      <div className="panel-section">
+        <button className="toolbar-btn sim-tab-primary" onClick={simulateFallNow} disabled={doc.agents.every((a) => a.kind !== 'person')}>
+          จำลองคนล้ม
+        </button>
+      </div>
+
+      <div className="panel-section">
+        <div className="panel-section-header">
+          <span>พื้นที่ (Zones)</span>
+        </div>
+        {doc.zones.length === 0 ? (
+          <p className="empty-hint">ยังไม่มีพื้นที่</p>
+        ) : (
+          <ul className="entity-outline">
+            {doc.zones.map((z) => (
+              <li key={z.id} className={selection === z.id ? 'active' : ''}>
+                <button onClick={() => setSelection(z.id)}>
+                  {z.name}
+                  <span className="level-meta">
+                    {' '}
+                    · {doc.levels.find((l) => l.id === z.levelId)?.name ?? '—'} · {APPLIES_TO_LABEL[z.appliesTo]}
+                  </span>
+                </button>
+                <input
+                  type="checkbox"
+                  checked={z.enabled}
+                  title="เปิดใช้งาน"
+                  onChange={(e) => apply((d) => updateZone(d, z.id, { enabled: e.target.checked }))}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="empty-hint">กด Z เพื่อวาดพื้นที่ / ติ๊กห้องใน Inspector</p>
+      </div>
     </div>
   );
 }
@@ -106,7 +228,7 @@ function LevelsTab() {
 
 function collectLevelEntities(doc: ReturnType<typeof useSceneStore.getState>['doc'], levelId: string) {
   const wallIds = new Set(doc.walls.filter((w) => w.levelId === levelId).map((w) => w.id));
-  const out: { id: string; kind: 'wall' | 'opening' | 'room' | 'object' | 'agent' | 'radio'; label: string }[] = [];
+  const out: { id: string; kind: 'wall' | 'opening' | 'room' | 'object' | 'agent' | 'radio' | 'stair'; label: string }[] = [];
   for (const w of doc.walls.filter((w) => w.levelId === levelId)) {
     out.push({ id: w.id, kind: 'wall', label: w.id.slice(-8) });
   }
@@ -119,11 +241,16 @@ function collectLevelEntities(doc: ReturnType<typeof useSceneStore.getState>['do
   for (const o of doc.objects.filter((o) => o.levelId === levelId)) {
     out.push({ id: o.id, kind: 'object', label: o.name });
   }
-  for (const a of doc.agents.filter((a) => a.levelId === levelId)) {
-    out.push({ id: a.id, kind: 'agent', label: a.kind });
+  // An agent "lives" on the level it spawns on; agents just passing through (waypoints/wander
+  // room on other levels) are listed there instead.
+  for (const a of doc.agents.filter((a) => a.start.levelId === levelId)) {
+    out.push({ id: a.id, kind: 'agent', label: a.name });
   }
   for (const r of doc.radios.filter((r) => r.levelId === levelId)) {
     out.push({ id: r.id, kind: 'radio', label: r.name });
+  }
+  for (const s of doc.stairs.filter((s) => s.fromLevelId === levelId || s.toLevelId === levelId)) {
+    out.push({ id: s.id, kind: 'stair', label: 'Stair' });
   }
   return out;
 }

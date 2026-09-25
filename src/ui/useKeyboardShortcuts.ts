@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { addRoom, removeEntity, toggleOpening, updateObject } from '../core';
+import { addRoom, addZone, removeEntity, toggleOpening, updateObject } from '../core';
 import { useSceneStore } from './store';
 import { findEntity } from './entityLookup';
 
@@ -30,11 +30,29 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Shift+Space toggles sim playback — plain Space is already taken by the opening toggle
+      // below, so this avoids the conflict the brief calls out.
+      if (e.key === ' ' && e.shiftKey) {
+        e.preventDefault();
+        store.toggle();
+        return;
+      }
+
       if (e.key === 'Enter' && store.tool === 'room' && store.draft?.kind === 'room-polygon') {
         if (store.draft.points.length >= 3) {
           const levelId = store.activeLevelId;
           const points = store.draft.points;
           store.applyOp((d) => addRoom(d, { levelId, polygon: points }));
+          store.clearDraft();
+        }
+        return;
+      }
+
+      if (e.key === 'Enter' && store.tool === 'zone' && store.draft?.kind === 'zone-polygon') {
+        if (store.draft.points.length >= 3) {
+          const levelId = store.activeLevelId;
+          const points = store.draft.points;
+          store.applyOp((d) => addZone(d, { levelId, polygon: points }));
           store.clearDraft();
         }
         return;
@@ -91,6 +109,9 @@ export function useKeyboardShortcuts() {
           break;
         case 'a':
           store.setTool('ap');
+          break;
+        case 'z':
+          store.setTool('zone');
           break;
         default:
           break;
