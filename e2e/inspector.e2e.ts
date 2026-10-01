@@ -1,6 +1,7 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 test('inspector wall thickness input commits on change and validates > 0', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Find a wall with openings on the sample house
@@ -36,6 +37,7 @@ test('inspector wall thickness input commits on change and validates > 0', async
 });
 
 test('inspector wall thickness with invalid value 0 is rejected', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Find a wall

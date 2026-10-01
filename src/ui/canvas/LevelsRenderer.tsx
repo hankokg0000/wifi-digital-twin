@@ -1,7 +1,8 @@
 import { useSceneStore } from '../store';
 import { LevelGroup } from './LevelGroup';
+import type { Bounds } from './bounds';
 
-export function LevelsRenderer() {
+export function LevelsRenderer({ bounds }: { bounds: Bounds }) {
   const doc = useSceneStore((s) => s.doc);
   const activeLevelId = useSceneStore((s) => s.activeLevelId);
   const viewMode = useSceneStore((s) => s.viewMode);
@@ -22,7 +23,7 @@ export function LevelsRenderer() {
         const interactive = isActive;
 
         return (
-          <LevelGroup key={level.id} level={level} opacity={opacity} interactive={interactive} />
+          <LevelGroup key={level.id} level={level} opacity={opacity} interactive={interactive} bounds={bounds} />
         );
       })}
     </>

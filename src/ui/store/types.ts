@@ -3,6 +3,16 @@ import type { SceneDoc, Id, Vec2 } from '../../core';
 export type Tool = 'select' | 'wall' | 'door' | 'window' | 'room' | 'object' | 'ap' | 'zone';
 export type ViewMode = 'plan' | '3d';
 export type SimSpeed = 1 | 5 | 20 | 60;
+/** Monitor = watch the live simulation; Edit = author the scene (tools, inspector). */
+export type Mode = 'monitor' | 'edit';
+
+/** One-shot request for the canvas camera to pan to a world point (x, z); `nonce` makes
+ * repeated requests for the same point distinct. */
+export interface FocusRequest {
+  x: number;
+  z: number;
+  nonce: number;
+}
 
 export interface SimState {
   t: number;
@@ -36,6 +46,8 @@ export interface DocSlice {
 }
 
 export interface ViewSlice {
+  mode: Mode;
+  focusRequest: FocusRequest | null;
   selection: Id | null;
   activeLevelId: Id;
   tool: Tool;
@@ -49,6 +61,9 @@ export interface ViewSlice {
    */
   cameraLocked: boolean;
 
+  /** Switching to Edit pauses the sim; switching either way resets tool/draft/selection. */
+  setMode: (m: Mode) => void;
+  requestFocus: (x: number, z: number) => void;
   setSelection: (id: Id | null) => void;
   setActiveLevelId: (id: Id) => void;
   setTool: (t: Tool) => void;
@@ -74,4 +89,14 @@ export interface SimSlice {
   resetTime: () => void;
 }
 
-export type SceneState = DocSlice & ViewSlice & SimSlice;
+export interface AlertSlice {
+  /**
+   * Alert ids the operator has acknowledged. UI state only — not in `doc`, not undo-tracked,
+   * not autosaved: acknowledging is "I have seen this", not an edit of the scene.
+   */
+  acknowledged: Record<string, true>;
+  acknowledge: (ids: string[]) => void;
+  clearAcknowledged: () => void;
+}
+
+export type SceneState = DocSlice & ViewSlice & SimSlice & AlertSlice;

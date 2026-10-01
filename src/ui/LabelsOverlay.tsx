@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from 'react';
+import { CameraOff, Wifi } from 'lucide-react';
 import { useSceneStore } from './store';
 import { registerLabel, unregisterLabel } from './canvas/labels';
 import type { Vec2 } from '../core';
@@ -78,9 +79,10 @@ export function LabelsOverlay() {
           <LabelDiv
             key={agent.id}
             id={`agent:${agent.id}`}
-            className="entity-label"
+            className={`agent-pill${selection === agent.id ? ' label-selected' : ''}`}
             world={[agent.start.p[0], (startLevel?.elevation ?? 0) + agent.height + 0.15, agent.start.p[1]]}
           >
+            <span className="agent-pill-dot" style={{ background: agent.color }} />
             {agent.name}
           </LabelDiv>
         );
@@ -95,22 +97,19 @@ export function LabelsOverlay() {
         return (
           <LabelDiv key={room.id} id={`room:${room.id}`} className="room-label" world={[cx, level.elevation + 0.05, cz]}>
             {room.name}
-            {!room.cameraAllowed && (
-              <span className="room-label-lock" title="no camera">
-                {' '}
-                🔒
-              </span>
-            )}
+            {!room.cameraAllowed && <CameraOff size={13} strokeWidth={1.5} aria-label="ห้องส่วนตัว ไม่มีกล้อง" />}
           </LabelDiv>
         );
       })}
       {zones.map((zone) => {
-        const room = zone.roomId !== undefined ? doc.rooms.find((r) => r.id === zone.roomId) : undefined;
-        const polygon = room ? room.polygon : zone.polygon;
+        // Room-linked zones are named after (and hatched over) their room, whose label is
+        // already centred there — a second label would just collide with it.
+        if (zone.roomId !== undefined) return null;
+        const polygon = zone.polygon;
         if (polygon.length < 3) return null;
         const [cx, cz] = centroid(polygon);
         return (
-          <LabelDiv key={zone.id} id={`zone:${zone.id}`} className="zone-label" world={[cx, level.elevation + 0.08, cz]}>
+          <LabelDiv key={zone.id} id={`zone:${zone.id}`} className={`zone-label${zone.enabled ? '' : ' zone-label-off'}`} world={[cx, level.elevation + 0.08, cz]}>
             {zone.name}
           </LabelDiv>
         );
@@ -119,9 +118,10 @@ export function LabelsOverlay() {
         <LabelDiv
           key={radio.id}
           id={`radio:${radio.id}`}
-          className="entity-label"
+          className="radio-label"
           world={[radio.position[0], level.elevation + radio.position[1] + 0.22, radio.position[2]]}
         >
+          <Wifi size={13} strokeWidth={1.5} />
           {radio.name}
         </LabelDiv>
       ))}

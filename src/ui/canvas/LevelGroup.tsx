@@ -10,6 +10,8 @@ import { ObjectMesh } from './ObjectMesh';
 import { RadioMesh } from './RadioMesh';
 import { ZoneMesh } from './ZoneMesh';
 import { GridFloor } from './GridFloor';
+import { FloorSlab } from './FloorSlab';
+import type { Bounds } from './bounds';
 import { InteractionPlane } from './InteractionPlane';
 import { SnapIndicator, DraftChainPreview, OpeningPreview } from './Previews';
 import { computeSnap, findHoverWall } from './snapping';
@@ -18,14 +20,16 @@ interface LevelGroupProps {
   level: Level;
   opacity: number;
   interactive: boolean;
+  bounds: Bounds;
 }
 
 /** Plan view slices walls at this height (m) so doors and windows read as gaps. */
 const PLAN_CUT_HEIGHT = 1.2;
 
-export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
+export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupProps) {
   const doc = useSceneStore((s) => s.doc);
   const tool = useSceneStore((s) => s.tool);
+  const editing = useSceneStore((s) => s.mode) === 'edit';
   const viewMode = useSceneStore((s) => s.viewMode);
   const cutHeight = viewMode === 'plan' ? PLAN_CUT_HEIGHT : undefined;
   const selection = useSceneStore((s) => s.selection);
@@ -58,7 +62,7 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
     [doc.materials],
   );
 
-  const selectable = interactive && tool === 'select';
+  const selectable = editing && interactive && tool === 'select';
 
   const select = useCallback(
     (id: Id) => (e: ThreeEvent<MouseEvent>) => {
@@ -108,7 +112,8 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
   return (
     <group position={[0, level.elevation, 0]}>
       {interactive && <GridFloor />}
-      {interactive && (
+      {viewMode === '3d' && <FloorSlab bounds={bounds} opacity={opacity} />}
+      {editing && interactive && (
         <InteractionPlane onPointerMove={handlePointerMove} onClick={handleClick} onContextMenu={handleContextMenu} />
       )}
 
@@ -200,15 +205,15 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
           />
         ))}
 
-      {interactive && hoverPoint && TOOL_HANDLERS[tool].snapIndicator && (
+      {editing && interactive && hoverPoint && TOOL_HANDLERS[tool].snapIndicator && (
         <SnapIndicator point={hoverPoint} snappedToEndpoint={computeSnap(hoverPoint, walls).snappedToEndpoint} />
       )}
 
-      {interactive && draft?.kind === 'wall-chain' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
-      {interactive && draft?.kind === 'room-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
-      {interactive && draft?.kind === 'zone-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
+      {editing && interactive && draft?.kind === 'wall-chain' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
+      {editing && interactive && draft?.kind === 'room-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
+      {editing && interactive && draft?.kind === 'zone-polygon' && <DraftChainPreview points={draft.points} cursor={hoverPoint} />}
 
-      {interactive && hoverWall && (tool === 'door' || tool === 'window') && (
+      {editing && interactive && hoverWall && (tool === 'door' || tool === 'window') && (
         <OpeningPreview
           wall={walls.find((w) => w.id === hoverWall.wallId)!}
           hover={hoverWall}

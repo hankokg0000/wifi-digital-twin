@@ -19,6 +19,15 @@ export function useKeyboardShortcuts() {
       const store = useSceneStore.getState();
       const mod = e.metaKey || e.ctrlKey;
 
+      // Monitor mode only transports the sim; every editing shortcut belongs to Edit mode.
+      if (store.mode === 'monitor') {
+        if (e.key === ' ' && (e.shiftKey || e.target === document.body)) {
+          e.preventDefault();
+          store.toggle();
+        }
+        return;
+      }
+
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) store.redo();
@@ -28,14 +37,6 @@ export function useKeyboardShortcuts() {
 
       if (e.key === 'Escape') {
         store.clearDraft();
-        return;
-      }
-
-      // Shift+Space toggles sim playback — plain Space is already taken by the opening toggle
-      // below, so this avoids the conflict the brief calls out.
-      if (e.key === ' ' && e.shiftKey) {
-        e.preventDefault();
-        store.toggle();
         return;
       }
 

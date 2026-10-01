@@ -1,6 +1,7 @@
-import { test, expect, snapshot, clickWorld, dragWorld, worldToScreen } from './helpers';
+import { test, expect, snapshot, clickWorld, dragWorld, worldToScreen, edit } from './helpers';
 
 test('object tool creates object with correct defaults at click point', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Object tool
@@ -20,6 +21,7 @@ test('object tool creates object with correct defaults at click point', async ({
 });
 
 test('selected object rotates with ] and [ and follows a left-button drag without panning the camera', async ({ app: page }) => {
+  await edit(page);
   await page.keyboard.press('o');
   await clickWorld(page, 12, 2);
   await page.keyboard.press('v');

@@ -1,8 +1,9 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 const FREE_X = 12;
 
 test('door tool creates opening with correct defaults', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Draw a wall first
@@ -33,6 +34,7 @@ test('door tool creates opening with correct defaults', async ({ app: page }) =>
 });
 
 test('window tool creates opening with correct defaults', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Draw a wall
@@ -61,6 +63,7 @@ test('window tool creates opening with correct defaults', async ({ app: page }) 
 });
 
 test('clicking door tool on existing door shows error', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Draw a wall

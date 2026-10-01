@@ -1,6 +1,7 @@
-import { test, expect, snapshot } from './helpers';
+import { test, expect, snapshot, edit } from './helpers';
 
 test('materials tab: update material 2.4 GHz loss', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Find brick material
@@ -10,7 +11,7 @@ test('materials tab: update material 2.4 GHz loss', async ({ app: page }) => {
   const oldLoss5 = brickMaterial.lossDb['5'];
 
   // Click on Materials tab
-  const materialsTab = page.getByRole('button', { name: /materials/i });
+  const materialsTab = page.getByRole('tab', { name: 'วัสดุ' });
   await materialsTab.click();
 
   // Find the input for brick's 2.4 GHz loss

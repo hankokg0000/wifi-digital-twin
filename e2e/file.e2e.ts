@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 async function fileMenu(page: import('@playwright/test').Page, item: string | RegExp) {
-  await page.getByRole('button', { name: /^File/ }).click();
-  await page.getByRole('button', { name: item, exact: typeof item === 'string' }).click();
+  await page.getByRole('button', { name: 'เมนูไฟล์' }).click();
+  await page.getByRole('menuitem', { name: item, exact: typeof item === 'string' }).click();
 }
 
 test('Save JSON downloads scene.json matching the current doc', async ({ app: page }) => {
@@ -33,6 +33,7 @@ test('Open JSON with an invalid file keeps the doc and lists the issues', async 
 });
 
 test('a saved file round-trips through New and Open JSON', async ({ app: page }) => {
+  await edit(page);
   await page.keyboard.press('w');
   await clickWorld(page, 12, 1);
   await clickWorld(page, 12, 3);

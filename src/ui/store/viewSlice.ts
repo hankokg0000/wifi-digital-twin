@@ -4,7 +4,9 @@ import type { SceneState, ViewSlice } from './types';
 
 export const createViewSlice =
   (initialDoc: SceneDoc): StateCreator<SceneState, [], [], ViewSlice> =>
-  (set) => ({
+  (set, get) => ({
+    mode: 'monitor',
+    focusRequest: null,
     selection: null,
     activeLevelId: initialDoc.levels[0]?.id ?? '',
     tool: 'select',
@@ -13,6 +15,11 @@ export const createViewSlice =
     lastError: null,
     cameraLocked: false,
 
+    setMode: (m) => {
+      if (m === 'edit') get().pause();
+      set({ mode: m, tool: 'select', draft: null, selection: null });
+    },
+    requestFocus: (x, z) => set({ focusRequest: { x, z, nonce: (get().focusRequest?.nonce ?? 0) + 1 } }),
     setSelection: (id) => set({ selection: id }),
     setActiveLevelId: (id) => set({ activeLevelId: id, selection: null, draft: null }),
     setTool: (t) => set({ tool: t, draft: null }),

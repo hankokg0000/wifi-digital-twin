@@ -1,8 +1,9 @@
-import { test, expect, snapshot, clickWorld, waitForCanvas } from './helpers';
+import { test, expect, snapshot, clickWorld, waitForCanvas, edit } from './helpers';
 
 const FREE_X = 12;
 
 test('autosave persists wall across page reload', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
   const beforeWallCount = before.doc.walls.length;
 

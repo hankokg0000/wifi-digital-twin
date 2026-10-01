@@ -14,12 +14,13 @@ const MIN_FALL_SPACING = 300; // s, minimum gap between two falls for the same p
 const PERSON_NAMES = [
   'สมชาย', 'สมศรี', 'มานี', 'ปิติ', 'ชูใจ', 'วีระ', 'ดวงใจ', 'ประเสริฐ', 'เก่ง', 'มาลี', 'สมหญิง', 'อรุณ',
 ];
-// Deliberately avoids '#5ac8fa' (the app's selection-highlight accent) — see ops.ts AGENT_DEFAULTS.
+// Agent categorical palette — hex equivalents of the UI tokens --person-1..8 (OKLCH L 0.75,
+// C 0.13, hues ~37-40 deg apart, skipping the 20-90 deg band reserved for critical/warning) and
+// --pet-1..4 (desaturated, C 0.045). Keep in sync with src/ui/theme/tokens.css.
 const PERSON_COLORS = [
-  '#4a90d9', '#e0699a', '#4caf50', '#f5a623', '#9b59b6', '#16a596',
-  '#d0021b', '#7f8c9a', '#c9a227', '#2f8fd0', '#e67e22', '#5d4a9c',
+  '#1cc1e3', '#bab245', '#ae9efa', '#7cc375', '#da8fd7', '#27c8af', '#71b1fe', '#f289a3',
 ];
-const PET_COLORS = ['#ff9a3c', '#8d6e63'];
+const PET_COLORS = ['#a1a98a', '#84aeb0', '#94a6c1', '#b29cb6'];
 
 function randRange(rng: () => number, min: number, max: number): number {
   return min + rng() * (max - min);

@@ -26,7 +26,7 @@ export function AgentInspector({ agent, doc }: { agent: Agent; doc: SceneDoc }) 
         <span className="readonly-value">{agent.kind === 'person' ? 'คน' : 'สัตว์เลี้ยง'}</span>
       </Field>
       <Field label="ท่าทางปัจจุบัน">
-        <span className={`readonly-value${state?.posture === 'fallen' ? ' text-danger' : ''}`}>{postureLabel}</span>
+        <span className={`readonly-value${state?.posture === 'fallen' ? ' text-critical' : ''}`}>{postureLabel}</span>
       </Field>
       <Field label="อยู่ที่ห้อง">
         <span className="readonly-value">{currentRoom?.name ?? '—'}</span>
@@ -35,7 +35,7 @@ export function AgentInspector({ agent, doc }: { agent: Agent; doc: SceneDoc }) 
       {agent.kind === 'person' && (
         <div className="field-block">
           <button
-            className="toolbar-btn"
+            className="btn btn-critical btn-block"
             onClick={() => apply((d) => addIncident(d, { agentId: agent.id, t: simT, duration: 180 }).doc)}
           >
             จำลองล้มตอนนี้

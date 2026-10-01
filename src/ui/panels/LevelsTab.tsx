@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { addLevel, removeLevel, updateLevel } from '../../core';
 import { useSceneStore } from '../store';
 import { KIND_LABEL } from '../entityLookup';
+import { Section } from '../components/Section';
 
 export function LevelsTab() {
   const doc = useSceneStore((s) => s.doc);
@@ -17,18 +19,20 @@ export function LevelsTab() {
 
   return (
     <div className="panel-body">
-      <div className="panel-section">
-        <div className="panel-section-header">
-          <span>Levels</span>
-          <button className="small-btn" onClick={() => applyOp((d) => addLevel(d))} title="Add level">
-            +
+      <Section
+        title="ชั้น"
+        aside={
+          <button className="icon-btn" onClick={() => applyOp((d) => addLevel(d))} title="Add level" aria-label="Add level">
+            <Plus size={16} strokeWidth={1.5} />
           </button>
-        </div>
-        <ul className="level-list">
+        }
+      >
+        <ul className="row-list level-list">
           {doc.levels.map((level) => (
-            <li key={level.id} className={level.id === activeLevelId ? 'active' : ''}>
+            <li key={level.id} className={`row${level.id === activeLevelId ? ' active' : ''}`}>
               {renamingId === level.id ? (
                 <input
+                  className="level-rename"
                   autoFocus
                   defaultValue={level.name}
                   onBlur={(e) => {
@@ -41,45 +45,43 @@ export function LevelsTab() {
                   }}
                 />
               ) : (
-                <button className="level-name" onClick={() => setActiveLevelId(level.id)} onDoubleClick={() => setRenamingId(level.id)}>
-                  {level.name}
-                  <span className="level-meta">
-                    {' '}
-                    (el {level.elevation.toFixed(1)}m, h {level.height.toFixed(1)}m)
+                <button className="row-main level-name" onClick={() => setActiveLevelId(level.id)} onDoubleClick={() => setRenamingId(level.id)}>
+                  <span>{level.name}</span>
+                  <span className="row-meta mono">
+                    el {level.elevation.toFixed(1)} m · h {level.height.toFixed(1)} m
                   </span>
                 </button>
               )}
               <button
-                className="small-btn danger"
+                className="icon-btn row-action"
                 title="Remove level"
+                aria-label="Remove level"
                 onClick={() => apply((d) => removeLevel(d, level.id))}
                 disabled={doc.levels.length <= 1}
               >
-                ×
+                <Trash2 size={16} strokeWidth={1.5} />
               </button>
             </li>
           ))}
         </ul>
-      </div>
+      </Section>
 
-      <div className="panel-section">
-        <div className="panel-section-header">
-          <span>Entities on active level</span>
-        </div>
+      <Section title="วัตถุในชั้นนี้" aside={<span className="mono">{activeEntities.length}</span>}>
         {activeEntities.length === 0 ? (
-          <p className="empty-hint">Nothing here yet.</p>
+          <p className="empty-hint">ยังไม่มีวัตถุในชั้นนี้</p>
         ) : (
-          <ul className="entity-outline">
+          <ul className="row-list entity-outline">
             {activeEntities.map(({ id, kind, label }) => (
-              <li key={id} className={selection === id ? 'active' : ''}>
-                <button onClick={() => setSelection(id)}>
-                  <span className="entity-kind">{KIND_LABEL[kind]}</span> {label}
+              <li key={id} className={`row${selection === id ? ' active' : ''}`}>
+                <button className="row-main" onClick={() => setSelection(id)}>
+                  <span className="entity-kind">{KIND_LABEL[kind]}</span>
+                  <span className="entity-label-text">{label}</span>
                 </button>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Section>
     </div>
   );
 }
@@ -88,7 +90,7 @@ function collectLevelEntities(doc: ReturnType<typeof useSceneStore.getState>['do
   const wallIds = new Set(doc.walls.filter((w) => w.levelId === levelId).map((w) => w.id));
   const out: { id: string; kind: 'wall' | 'opening' | 'room' | 'object' | 'agent' | 'radio' | 'stair'; label: string }[] = [];
   for (const w of doc.walls.filter((w) => w.levelId === levelId)) {
-    out.push({ id: w.id, kind: 'wall', label: w.id.slice(-8) });
+    out.push({ id: w.id, kind: 'wall', label: `${Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]).toFixed(1)} m` });
   }
   for (const o of doc.openings.filter((o) => wallIds.has(o.wallId))) {
     out.push({ id: o.id, kind: 'opening', label: `${o.kind} · ${o.open ? 'open' : 'closed'}` });

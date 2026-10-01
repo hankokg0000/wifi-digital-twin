@@ -1,0 +1,75 @@
+.popover {
+  position: fixed;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: var(--sp-1);
+  background: var(--surface-2);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-pop);
+}
+
+.popover button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-align: left;
+}
+
+.popover button svg {
+  color: var(--ink-2);
+}
+
+.popover button:hover {
+  background: var(--surface-3);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  background: oklch(0.1 0.01 265 / 0.6);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: min(480px, calc(100vw - 32px));
+  max-height: 60vh;
+  padding: var(--sp-5);
+  background: var(--surface-1);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-pop);
+}
+
+.modal h3 {
+  font-size: var(--fs-4);
+  font-weight: 600;
+}
+
+.issue-list {
+  margin: 0;
+  padding-left: var(--sp-4);
+  overflow-y: auto;
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+}
+
+.issue-list code {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.modal .btn {
+  align-self: flex-end;
+}

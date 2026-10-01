@@ -1,0 +1,301 @@
+/* ---------- tool palette ---------- */
+
+.tool-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  text-align: left;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.tool-btn:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.tool-btn.active {
+  background: var(--accent-weak);
+  color: var(--ink);
+}
+
+.tool-btn.active svg {
+  color: var(--accent);
+}
+
+.tool-label {
+  flex: 1;
+}
+
+.tool-key {
+  min-width: 20px;
+  padding: 0 5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-3);
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 1279px) {
+  .tool-palette {
+    align-items: center;
+    padding: 0;
+    border-bottom: none;
+  }
+  .tool-btn {
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+  .tool-label,
+  .tool-key {
+    display: none;
+  }
+}
+
+/* ---------- left tabs ---------- */
+
+.edit-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-btn {
+  position: relative;
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+}
+
+.tab-btn.active {
+  color: var(--ink);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.tab-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- rows (levels, entities, occupants share this) ---------- */
+
+.row-list {
+  list-style: none;
+  margin: 0 calc(var(--sp-2) * -1);
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-2);
+}
+
+.row:hover {
+  background: var(--surface-2);
+}
+
+.row.active {
+  background: var(--accent-weak);
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  padding: 0 var(--sp-2);
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  text-align: left;
+}
+
+.row-main > span:first-child {
+  font-weight: 500;
+}
+
+.row-meta {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+.row-action {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.entity-kind {
+  min-width: 52px;
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+.entity-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+
+.empty-hint {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+/* ---------- materials ---------- */
+
+.materials-body {
+  padding: var(--sp-4);
+}
+
+.materials-body .empty-hint {
+  margin-bottom: var(--sp-3);
+}
+
+.materials-table,
+.iface-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-1);
+}
+
+.materials-table th,
+.iface-table th {
+  padding: 0 0 var(--sp-2);
+  color: var(--ink-3);
+  font-weight: 400;
+  text-align: left;
+}
+
+.materials-table td,
+.iface-table td {
+  padding: 3px 4px 3px 0;
+  border-top: 1px solid var(--line);
+}
+
+.materials-table td:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  font-size: var(--fs-2);
+}
+
+.materials-table input,
+.iface-table input,
+.iface-table select {
+  min-height: 28px;
+  padding: 0 6px;
+}
+
+.color-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+/* ---------- inspector ---------- */
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--sp-4);
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 48px;
+  padding: 0 var(--sp-3) 0 var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-kind {
+  font-size: var(--fs-3);
+  font-weight: 600;
+}
+
+.inspector-header .btn {
+  margin-left: auto;
+}
+
+.inspector-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sp-3);
+  height: 100%;
+  padding: var(--sp-5);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.inspector-empty svg {
+  color: var(--ink-3);
+}
+
+.warning-list {
+  margin: 0;
+  padding-left: var(--sp-4);
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+}
+
+.field-hint {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}

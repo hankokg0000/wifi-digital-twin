@@ -4,6 +4,8 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Zone } from '../../core';
+import { PALETTE } from '../theme/palette';
+import { prefersReducedMotion } from '../theme/motion';
 import { isZoneOccupied } from './zoneOccupancy';
 
 interface ZoneMeshProps {
@@ -14,25 +16,59 @@ interface ZoneMeshProps {
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }
 
-const RESTRICTED_COLOR = '#d0021b';
-const DISABLED_COLOR = '#6b7280';
-const SELECTED_COLOR = '#5ac8fa';
+const HATCH_SPACING = 0.32; // m between hatch lines (UVs of ShapeGeometry are world meters)
 
-/** Translucent fill + dashed outline for a restricted zone. Enabled zones pulse brighter while
- * an applicable agent is inside (driven every frame from the zoneOccupancy registry, no React
- * state — matches AgentsLayer's per-frame-motion-without-re-render rule). Disabled zones render
- * as a grey dashed outline only (no fill), per the design brief. */
+let hatchTexture: THREE.CanvasTexture | null = null;
+
+/** Diagonal hatch in the warning hue over a faint wash; one shared texture, tiled in world
+ * space (ShapeGeometry UVs are the polygon's own x/y meters, so `repeat = 1/spacing`). */
+function getHatchTexture(): THREE.CanvasTexture {
+  if (hatchTexture) return hatchTexture;
+  const px = 64;
+  const c = document.createElement('canvas');
+  c.width = px;
+  c.height = px;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(255,255,255,0.10)';
+  g.fillRect(0, 0, px, px);
+  g.strokeStyle = 'rgba(255,255,255,0.95)';
+  g.lineWidth = 5;
+  for (const o of [-px, 0, px]) {
+    g.beginPath();
+    g.moveTo(o, px);
+    g.lineTo(o + px, 0);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1 / HATCH_SPACING, 1 / HATCH_SPACING);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  hatchTexture = tex;
+  return tex;
+}
+
+/** Restricted zone: warning-hue diagonal hatch + dashed outline. When an applicable agent is
+ * inside, the hatch strengthens and the outline goes solid (driven per frame from the
+ * zoneOccupancy registry — no React state). Disabled zones are an ink-3 dashed outline only. */
 export function ZoneMesh({ zone, polygon, selected, interactive, onSelect }: ZoneMeshProps) {
   const fillRef = useRef<THREE.Mesh>(null);
-  const baseColor = selected ? SELECTED_COLOR : zone.enabled ? RESTRICTED_COLOR : DISABLED_COLOR;
-  const baseOpacity = selected ? 0.4 : zone.enabled ? 0.18 : 0;
+  const dashedRef = useRef<THREE.Object3D>(null);
+  const solidRef = useRef<THREE.Object3D>(null);
+  const reduced = useMemo(() => prefersReducedMotion(), []);
+
+  const outlineColor = selected ? PALETTE.accent : zone.enabled ? PALETTE.warning : PALETTE.ink3;
+  const IDLE = 0.34;
 
   useFrame(({ clock }) => {
-    if (!fillRef.current || !zone.enabled || selected) return;
-    const mat = fillRef.current.material as THREE.MeshBasicMaterial;
-    const pulsing = isZoneOccupied(zone.id);
-    const target = pulsing ? 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4)) : baseOpacity;
-    if (Math.abs(mat.opacity - target) > 0.002) mat.opacity = target;
+    const occupied = zone.enabled && isZoneOccupied(zone.id);
+    if (fillRef.current && zone.enabled && !selected) {
+      const mat = fillRef.current.material as THREE.MeshBasicMaterial;
+      const target = occupied ? (reduced ? 0.8 : 0.72 + 0.2 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4))) : IDLE;
+      if (Math.abs(mat.opacity - target) > 0.002) mat.opacity = target;
+    }
+    if (dashedRef.current) dashedRef.current.visible = !occupied;
+    if (solidRef.current) solidRef.current.visible = occupied;
   });
 
   const shape = useMemo(() => {
@@ -56,14 +92,39 @@ export function ZoneMesh({ zone, polygon, selected, interactive, onSelect }: Zon
 
   if (!shape) return null;
 
+  const showHatch = zone.enabled && !selected;
+
   return (
     <group>
-      <mesh ref={fillRef} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={interactive ? onSelect : undefined}>
-        <shapeGeometry args={[shape]} />
-        <meshBasicMaterial color={baseColor} transparent opacity={baseOpacity} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
+      {(showHatch || selected) && (
+        <mesh ref={fillRef} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={interactive ? onSelect : undefined}>
+          <shapeGeometry args={[shape]} />
+          {selected ? (
+            <meshBasicMaterial color={PALETTE.accent} transparent opacity={0.2} side={THREE.DoubleSide} depthWrite={false} />
+          ) : (
+            <meshBasicMaterial
+              color={PALETTE.warning}
+              map={getHatchTexture()}
+              transparent
+              opacity={IDLE}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          )}
+        </mesh>
+      )}
+      {!zone.enabled && interactive && (
+        // Disabled zones have no fill, but stay clickable in Edit mode via an invisible mesh.
+        <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={onSelect}>
+          <shapeGeometry args={[shape]} />
+          <meshBasicMaterial visible={false} />
+        </mesh>
+      )}
       {outlinePoints.length >= 2 && (
-        <Line points={outlinePoints} color={baseColor} lineWidth={2} dashed dashSize={0.2} gapSize={0.12} />
+        <>
+          <Line ref={dashedRef as never} points={outlinePoints} color={outlineColor} lineWidth={1.75} dashed dashSize={0.22} gapSize={0.14} />
+          {zone.enabled && <Line ref={solidRef as never} points={outlinePoints} color={outlineColor} lineWidth={2.5} visible={false} />}
+        </>
       )}
     </group>
   );

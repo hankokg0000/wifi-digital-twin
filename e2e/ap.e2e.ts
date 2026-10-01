@@ -1,6 +1,7 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 test('AP tool creates radio with correct defaults and dual-band interfaces', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // AP tool

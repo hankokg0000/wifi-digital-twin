@@ -1,6 +1,7 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 test('selecting wall with openings and deleting removes wall and all its openings', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Find a wall with openings on the ground floor (first level)
@@ -34,6 +35,7 @@ test('selecting wall with openings and deleting removes wall and all its opening
 });
 
 test('Space key toggles opening open/closed state', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Find a door

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MousePointerClick, Trash2 } from 'lucide-react';
 import { removeEntity } from '../../core';
 import { useSceneStore } from '../store';
 import { findEntity, KIND_LABEL } from '../entityLookup';
@@ -20,8 +21,9 @@ export function Inspector() {
 
   if (!selection) {
     return (
-      <div className="inspector">
-        <p className="empty-hint">Select an entity to edit its properties.</p>
+      <div className="inspector inspector-empty">
+        <MousePointerClick size={24} strokeWidth={1.5} />
+        <p>เลือกวัตถุในแผนผังเพื่อแก้ไขคุณสมบัติ</p>
       </div>
     );
   }
@@ -29,8 +31,8 @@ export function Inspector() {
   const found = findEntity(doc, selection);
   if (!found) {
     return (
-      <div className="inspector">
-        <p className="empty-hint">Selection no longer exists.</p>
+      <div className="inspector inspector-empty">
+        <p>วัตถุที่เลือกไม่มีอยู่แล้ว</p>
       </div>
     );
   }
@@ -68,7 +70,8 @@ export function Inspector() {
     <div className="inspector">
       <div className="inspector-header">
         <span className="inspector-kind">{KIND_LABEL[found.kind]}</span>
-        <button className="small-btn danger" onClick={remove} title="Delete">
+        <button className="btn btn-sm btn-critical" onClick={remove} title="Delete">
+          <Trash2 size={14} strokeWidth={1.5} />
           Delete
         </button>
       </div>

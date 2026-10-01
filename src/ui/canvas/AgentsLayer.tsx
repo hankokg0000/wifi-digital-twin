@@ -11,6 +11,8 @@ import { simClockRef } from '../simClock';
 import { updateLabelWorld, setLabelHidden, toggleLabelClass } from './labels';
 import { setZoneOccupied } from './zoneOccupancy';
 import { AgentMesh } from './AgentMesh';
+import { PALETTE } from '../theme/palette';
+import { prefersReducedMotion } from '../theme/motion';
 
 const ROUTE_PREVIEW_WINDOW = 60; // s — how far ahead the selected agent's route line is drawn
 
@@ -32,7 +34,7 @@ function levelOpacity(doc: SceneDoc, levelId: Id, activeLevelId: Id, viewMode: '
 
 function applyOpacity(group: THREE.Group, opacity: number) {
   group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
+    if (obj instanceof THREE.Mesh && !obj.userData.fx) {
       const mat = obj.material as THREE.MeshStandardMaterial;
       if (mat.opacity !== opacity) mat.opacity = opacity;
       const transparent = opacity < 1;
@@ -58,6 +60,7 @@ export function AgentsLayer() {
   const plans = useSimPlans();
 
   const groupRefs = useRef(new Map<Id, THREE.Group>());
+  const reducedMotion = useRef(prefersReducedMotion());
 
   useFrame(({ clock }) => {
     const t = simClockRef.t;
@@ -98,12 +101,32 @@ export function AgentsLayer() {
       const standingGroup = group.getObjectByName('standing');
       const fallenGroup = group.getObjectByName('fallen');
       if (standingGroup) standingGroup.visible = !fallen;
-      if (fallenGroup) {
-        fallenGroup.visible = fallen;
-        if (fallen) {
-          const ring = fallenGroup.getObjectByName('fallenRing') as THREE.Mesh | undefined;
-          const mat = ring?.material as THREE.MeshBasicMaterial | undefined;
-          if (mat) mat.opacity = 0.5 + 0.4 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4));
+      if (fallenGroup) fallenGroup.visible = fallen;
+      // Floor effects (halo, selection ring, alarm rings) only at full strength: ghosted
+      // levels in 3D show just the body.
+      const fx = group.getObjectByName('floorfx');
+      if (fx) {
+        fx.visible = opacity === 1;
+        const halo = fx.getObjectByName('halo');
+        if (halo) halo.visible = !fallen;
+        const alarm = fx.getObjectByName('alarm');
+        if (alarm) {
+          alarm.visible = fallen;
+          if (fallen) {
+            for (let i = 0; i < 3; i++) {
+              const ring = alarm.getObjectByName(`alarmRing${i}`) as THREE.Mesh | undefined;
+              if (!ring) continue;
+              const mat = ring.material as THREE.MeshBasicMaterial;
+              if (reducedMotion.current) {
+                ring.scale.setScalar(0.5 + i * 0.4);
+                mat.opacity = 0.85 - i * 0.28;
+              } else {
+                const phase = (clock.elapsedTime * 0.7 + i / 3) % 1;
+                ring.scale.setScalar(0.35 + phase * 1.15);
+                mat.opacity = (1 - phase) * 0.85;
+              }
+            }
+          }
         }
       }
 
@@ -154,7 +177,7 @@ export function AgentsLayer() {
           <Line
             key={i}
             points={seg.path.map(([x, z]): [number, number, number] => [x, 0.05, z])}
-            color="#5ac8fa"
+            color={PALETTE.accent}
             lineWidth={2}
             dashed
             dashSize={0.3}
@@ -170,7 +193,7 @@ export function AgentsLayer() {
           .map(({ wp, i }) => (
             <mesh key={i} position={[wp.p[0], 0.06, wp.p[1]]} rotation={[-Math.PI / 2, 0, 0]}>
               <circleGeometry args={[0.15, 16]} />
-              <meshBasicMaterial color="#5ac8fa" transparent opacity={0.85} depthWrite={false} />
+              <meshBasicMaterial color={PALETTE.accent} transparent opacity={0.85} depthWrite={false} />
             </mesh>
           ))}
     </>

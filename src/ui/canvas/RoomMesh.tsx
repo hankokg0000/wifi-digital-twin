@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Room } from '../../core';
+import { PALETTE } from '../theme/palette';
 
 interface RoomMeshProps {
   room: Room;
@@ -11,6 +12,8 @@ interface RoomMeshProps {
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }
 
+/** A very subtle floor fill — rooms are told apart by their label, never by color. Camera
+ * privacy is an icon on the room label, not a tint. */
 export function RoomMesh({ room, selected, interactive, opacity, onSelect }: RoomMeshProps) {
   const shape = useMemo(() => {
     const s = new THREE.Shape();
@@ -24,20 +27,16 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
     return s;
   }, [room.polygon]);
 
-  const fillColor = room.cameraAllowed ? '#3a6fa8' : '#8a4a5c';
-
   return (
-    <group>
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={interactive ? onSelect : undefined}>
-        <shapeGeometry args={[shape]} />
-        <meshBasicMaterial
-          color={selected ? '#5ac8fa' : fillColor}
-          transparent
-          opacity={selected ? 0.45 : 0.25 * opacity + 0.05}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-    </group>
+    <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={interactive ? onSelect : undefined}>
+      <shapeGeometry args={[shape]} />
+      <meshBasicMaterial
+        color={selected ? PALETTE.accent : PALETTE.surface2}
+        transparent
+        opacity={selected ? 0.28 : 0.85 * opacity}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
   );
 }

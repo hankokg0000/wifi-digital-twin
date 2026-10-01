@@ -94,6 +94,34 @@ export async function dragWorld(page: Page, from: Vec2, to: Vec2, y = 0) {
   await page.mouse.up();
 }
 
+/**
+ * Switch to Edit mode (tools, inspector, left-rail tabs live there; the app opens in Monitor)
+ * and wait until the canvas has re-framed for Edit and held that camera for a few rendered
+ * frames — clicks are projected with the live camera, so it must have settled first.
+ */
+export async function edit(page: Page) {
+  const x0 = await page.evaluate(() => (window as any).__r3f.camera.position.x as number);
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.waitForFunction(() => (window as any).__sceneStore.getState().mode === 'edit');
+  await page.waitForFunction(
+    (before) => {
+      const w = window as any;
+      const r = w.__r3f;
+      const c = r.camera;
+      if (c.position.x === before) return false; // Edit camera not applied yet
+      const sig = `${c.zoom}|${c.position.x}|${c.position.z}|${r.size.width}|${r.size.height}`;
+      if (w.__camSig !== sig) {
+        w.__camSig = sig;
+        w.__camFrame = r.gl.info.render.frame;
+        return false;
+      }
+      return r.gl.info.render.frame >= w.__camFrame + 3;
+    },
+    x0,
+    { polling: 100 },
+  );
+}
+
 /** Round to 0.1 m grid for exact snap assertions. */
 export const grid = (n: number) => Math.round(n * 10) / 10;
 

@@ -1,8 +1,14 @@
 import { useMemo } from 'react';
+import { Edges } from '@react-three/drei';
 import type { Stair } from '../../core';
+import { useSceneStore } from '../store';
+import { oklchToHex } from '../theme/color';
+import { PALETTE } from '../theme/palette';
+import { SelectionHull } from './SelectionHull';
 
 const STEP_THICKNESS = 0.15;
 const RISER_TARGET = 0.18; // m — typical stair riser height, used only to pick a step count
+const TREAD_EDGE = oklchToHex(0.5, 0.014, 265);
 
 interface StairMeshProps {
   stair: Stair;
@@ -15,6 +21,7 @@ interface StairMeshProps {
  * absolute world space (not nested under a level group) so it reads correctly in both the
  * lower and upper level's views without duplication. */
 export function StairMesh({ stair, fromElevation, toElevation, selected }: StairMeshProps) {
+  const plan = useSceneStore((s) => s.viewMode) === 'plan';
   const steps = useMemo(() => {
     const rise = toElevation - fromElevation;
     const stepCount = Math.max(4, Math.round(Math.abs(rise) / RISER_TARGET));
@@ -34,14 +41,19 @@ export function StairMesh({ stair, fromElevation, toElevation, selected }: Stair
     return { out, treadDepth, angle };
   }, [stair, fromElevation, toElevation]);
 
-  const color = selected ? '#5ac8fa' : '#8a8f96';
-
   return (
     <group>
       {steps.out.map((s, i) => (
         <mesh key={i} position={[s.x, s.y, s.z]} rotation={[0, steps.angle, 0]}>
           <boxGeometry args={[stair.width, STEP_THICKNESS, steps.treadDepth]} />
-          <meshStandardMaterial color={color} emissive={selected ? '#1c6fa8' : '#000000'} emissiveIntensity={selected ? 0.3 : 0} />
+          {plan ? (
+            // Alternate tread shades + a hairline edge: the plan symbol for a staircase, hatched.
+            <meshBasicMaterial color={i % 2 === 0 ? PALETTE.surface3 : PALETTE.surface2} />
+          ) : (
+            <meshStandardMaterial color={PALETTE.furniture3d} roughness={0.9} />
+          )}
+          <Edges color={selected ? PALETTE.accent : TREAD_EDGE} threshold={20} />
+          {selected && <SelectionHull size={[stair.width, STEP_THICKNESS, steps.treadDepth]} />}
         </mesh>
       ))}
     </group>

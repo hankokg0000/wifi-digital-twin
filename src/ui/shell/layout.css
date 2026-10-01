@@ -1,0 +1,170 @@
+.app {
+  display: grid;
+  height: 100%;
+  grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas:
+    'top top top'
+    'left canvas right';
+}
+
+.app[data-mode='monitor'] {
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr) var(--timeline-h);
+  grid-template-areas:
+    'top top top'
+    'left canvas right'
+    'time time time';
+}
+
+.canvas-area {
+  grid-area: canvas;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas-area > canvas {
+  display: block;
+}
+
+/* ---------- rails ---------- */
+
+.rail {
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface-1);
+  position: relative;
+}
+
+.rail-left {
+  grid-area: left;
+  border-right: 1px solid var(--line);
+}
+
+.rail-right {
+  grid-area: right;
+  border-left: 1px solid var(--line);
+}
+
+.rail-scroll {
+  height: 100%;
+  overflow-y: auto;
+}
+
+aside.rail-left,
+aside.rail-right {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+aside.rail-right > *,
+aside.rail-left > .rail-scroll,
+aside.rail-left > .edit-tabs {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- compact rails (< 1280px) ---------- */
+
+@media (max-width: 1279px) {
+  .app {
+    grid-template-columns: var(--rail-compact) minmax(0, 1fr) var(--rail-compact);
+  }
+}
+
+.rail-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  z-index: var(--z-rail);
+}
+
+.rail-toggle {
+  position: relative;
+}
+
+.rail-badge {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.rail-badge-critical {
+  background: var(--critical);
+  color: var(--ink);
+}
+
+.rail-badge-warning {
+  background: var(--warning);
+  color: var(--accent-ink);
+}
+
+.rail-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-pop);
+}
+
+.rail-overlay > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.rail-overlay-left {
+  left: 100%;
+  width: var(--rail-left);
+}
+
+.rail-overlay-right {
+  right: 100%;
+  width: var(--rail-right);
+}
+
+.rail-inspector {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- toast (errors) ---------- */
+
+.toast {
+  position: fixed;
+  bottom: var(--sp-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: min(560px, 80vw);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-3);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+}
+
+.toast svg {
+  flex: none;
+  color: var(--ink-2);
+}

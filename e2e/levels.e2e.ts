@@ -1,17 +1,17 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 test('sample house starts on the ground floor', async ({ app: page }) => {
+  await edit(page);
   const s = await snapshot(page);
   expect(s.doc.levels).toHaveLength(2);
   expect(s.activeLevelId).toBe(s.doc.levels[0]!.id);
 });
 
 test('add a level, draw on it, then remove it with its contents', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
-  // The left panel now opens on the "จำลอง" (Sim) tab by default (design brief §3) — switch to
-  // Levels first.
-  await page.getByRole('button', { name: 'Levels', exact: true }).click();
+  // Edit mode's left rail opens on the "ชั้น" (levels) tab.
   await page.getByTitle('Add level').click();
   const added = await snapshot(page);
   expect(added.doc.levels).toHaveLength(3);
@@ -22,7 +22,7 @@ test('add a level, draw on it, then remove it with its contents', async ({ app: 
   expect(level.height).toBe(3);
   expect(added.activeLevelId).toBe(before.activeLevelId);
 
-  await page.getByRole('button', { name: /ชั้น 3/ }).click();
+  await page.locator('.level-list').getByRole('button', { name: /ชั้น 3/ }).click();
   expect((await snapshot(page)).activeLevelId).toBe(level.id);
 
   await page.keyboard.press('w');
@@ -41,10 +41,10 @@ test('add a level, draw on it, then remove it with its contents', async ({ app: 
 });
 
 test('the last remaining level cannot be removed', async ({ app: page }) => {
-  await page.getByRole('button', { name: /^File/ }).click();
-  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await edit(page);
+  await page.getByRole('button', { name: 'เมนูไฟล์' }).click();
+  await page.getByRole('menuitem', { name: 'New', exact: true }).click();
 
   expect((await snapshot(page)).doc.levels).toHaveLength(1);
-  await page.getByRole('button', { name: 'Levels', exact: true }).click();
   await expect(page.getByTitle('Remove level')).toBeDisabled();
 });

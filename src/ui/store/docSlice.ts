@@ -97,6 +97,7 @@ export const createDocSlice =
         selection: null,
         activeLevelId: d.levels[0]?.id ?? '',
         draft: null,
+        acknowledged: {},
       });
       scheduleAutosave(d);
     },

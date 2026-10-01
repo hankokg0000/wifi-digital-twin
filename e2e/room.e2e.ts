@@ -1,6 +1,7 @@
-import { test, expect, snapshot, clickWorld } from './helpers';
+import { test, expect, snapshot, clickWorld, edit } from './helpers';
 
 test('room tool: 4 clicks to close, creates room with correct polygon', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Room tool
@@ -25,6 +26,7 @@ test('room tool: 4 clicks to close, creates room with correct polygon', async ({
 });
 
 test('room tool: 3 points + Enter closes room', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Room tool
@@ -47,6 +49,7 @@ test('room tool: 3 points + Enter closes room', async ({ app: page }) => {
 });
 
 test('room tool: 2 points + Escape cancels without creating room', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Room tool

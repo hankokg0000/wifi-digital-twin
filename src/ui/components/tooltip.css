@@ -1,0 +1,42 @@
+.tooltip {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 280px;
+  white-space: nowrap;
+  padding: 5px 9px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  font-size: var(--fs-1);
+  pointer-events: none;
+  box-shadow: var(--shadow-pop);
+}
+
+.tooltip-right {
+  transform: translateY(-50%);
+}
+
+.tooltip-bottom {
+  transform: translateX(-50%);
+}
+
+.tooltip-bottom-end {
+  transform: translateX(-100%);
+}
+
+.tooltip-top {
+  transform: translate(-50%, -100%);
+}
+
+.tooltip kbd {
+  padding: 0 5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-2);
+  font-size: 11px;
+}

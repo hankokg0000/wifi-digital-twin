@@ -1,8 +1,9 @@
-import { test, expect, snapshot, clickWorld, grid } from './helpers';
+import { test, expect, snapshot, clickWorld, grid, edit } from './helpers';
 
 const FREE_X = 12;
 
 test('draw wall, undo with Cmd+Z/Ctrl+Z removes it, redo restores', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Draw a wall
@@ -31,6 +32,7 @@ test('draw wall, undo with Cmd+Z/Ctrl+Z removes it, redo restores', async ({ app
 });
 
 test('toolbar Undo/Redo buttons work and disabled state reflects history', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Initially Undo should be disabled
@@ -68,6 +70,7 @@ test('toolbar Undo/Redo buttons work and disabled state reflects history', async
 });
 
 test('new edit after undo clears redo history', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   // Draw first wall

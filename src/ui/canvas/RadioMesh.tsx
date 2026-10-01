@@ -1,5 +1,8 @@
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Radio } from '../../core';
+import { oklchToHex } from '../theme/color';
+import { PALETTE } from '../theme/palette';
+import { SelectionHullSphere } from './SelectionHull';
 
 interface RadioMeshProps {
   radio: Radio;
@@ -10,30 +13,27 @@ interface RadioMeshProps {
   onDragStart: (e: ThreeEvent<MouseEvent>) => void;
 }
 
+// Radios are infrastructure, not alerts: accent-neutral (a quiet tint of the accent hue) for
+// APs, plain ink for clients, the "ok" green for sensor nodes.
 const ROLE_COLOR: Record<Radio['role'], string> = {
-  ap: '#ffb020',
-  client: '#5ac8fa',
-  'sensor-node': '#8ee08e',
+  ap: oklchToHex(0.8, 0.07, 285),
+  client: PALETTE.ink2,
+  'sensor-node': PALETTE.ok,
 };
 
 export function RadioMesh({ radio, selected, interactive, opacity, onSelect, onDragStart }: RadioMeshProps) {
   const [x, y, z] = radio.position;
-  const color = selected ? '#5ac8fa' : ROLE_COLOR[radio.role];
-
   return (
     <group position={[x, y, z]}>
-      <mesh
-        onClick={interactive ? onSelect : undefined}
-        onPointerDown={interactive && selected ? onDragStart : undefined}
-      >
-        <sphereGeometry args={[0.12, 16, 16]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={selected ? '#1c6fa8' : '#000000'}
-          emissiveIntensity={selected ? 0.5 : 0}
-          transparent={opacity < 1}
-          opacity={opacity}
-        />
+      <mesh onClick={interactive ? onSelect : undefined} onPointerDown={interactive && selected ? onDragStart : undefined}>
+        <sphereGeometry args={[0.14, 20, 20]} />
+        <meshBasicMaterial color={ROLE_COLOR[radio.role]} transparent={opacity < 1} opacity={opacity} />
+        {selected && <SelectionHullSphere radius={0.14} />}
+      </mesh>
+      {/* floor-plan marker ring so the AP reads from above */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.2, 0.25, 32]} />
+        <meshBasicMaterial color={selected ? PALETTE.accent : ROLE_COLOR[radio.role]} transparent opacity={0.55 * opacity} depthWrite={false} />
       </mesh>
     </group>
   );

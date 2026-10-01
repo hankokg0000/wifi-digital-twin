@@ -1,0 +1,91 @@
+/* Design tokens — "dark ops console". OKLCH throughout; neutrals tinted toward hue 265.
+ * Strategy: Restrained. One accent (selection, primary action, focus). Red/amber are reserved
+ * for alerts and never used decoratively. Hex mirrors for three.js live in palette.ts. */
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: oklch(0.17 0.012 265);
+  --surface-1: oklch(0.205 0.012 265);
+  --surface-2: oklch(0.24 0.013 265);
+  --surface-3: oklch(0.29 0.014 265);
+  --line: oklch(0.32 0.012 265);
+
+  /* ink */
+  --ink: oklch(0.95 0.005 265);
+  --ink-2: oklch(0.78 0.01 265);
+  --ink-3: oklch(0.62 0.012 265);
+
+  /* accent */
+  --accent: oklch(0.72 0.15 285);
+  --accent-weak: oklch(0.72 0.15 285 / 0.16);
+  --accent-ink: oklch(0.17 0.012 265); /* text on solid accent */
+
+  /* semantic states — alerts only */
+  --critical: oklch(0.66 0.21 25);
+  --critical-weak: oklch(0.66 0.21 25 / 0.16);
+  --critical-ink: oklch(0.8 0.14 25); /* critical text on dark / weak backgrounds */
+  --critical-solid: oklch(0.5 0.19 25); /* banner surface: white text stays >= 5:1 */
+  --warning: oklch(0.82 0.15 80);
+  --warning-weak: oklch(0.82 0.15 80 / 0.16);
+  --ok: oklch(0.76 0.14 155);
+  --ok-weak: oklch(0.76 0.14 155 / 0.14);
+
+  /* agents: 8-step categorical, L 0.75 C 0.13, ~38deg apart, skipping the 20-90deg alert band */
+  --person-1: oklch(0.75 0.13 217);
+  --person-2: oklch(0.75 0.13 105);
+  --person-3: oklch(0.75 0.13 291);
+  --person-4: oklch(0.75 0.13 142);
+  --person-5: oklch(0.75 0.13 328);
+  --person-6: oklch(0.75 0.13 179);
+  --person-7: oklch(0.75 0.13 254);
+  --person-8: oklch(0.75 0.13 5);
+  --pet-1: oklch(0.72 0.045 120);
+  --pet-2: oklch(0.72 0.045 200);
+  --pet-3: oklch(0.72 0.045 260);
+  --pet-4: oklch(0.72 0.045 320);
+
+  /* type */
+  --font-ui: 'IBM Plex Sans Thai', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --fs-1: 0.75rem; /* 12 */
+  --fs-2: 0.8125rem; /* 13 — base UI */
+  --fs-3: 0.9375rem; /* 15 */
+  --fs-4: 1.125rem; /* 18 */
+  --fs-5: 1.375rem; /* 22 */
+  --fs-6: 1.75rem; /* 28 — clock */
+  --lh: 1.45; /* Thai vowels and tone marks need the room */
+
+  /* space / shape */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+
+  /* layout */
+  --topbar-h: 48px;
+  --rail-left: 300px;
+  --rail-right: 340px;
+  --rail-compact: 56px;
+  --timeline-h: 96px;
+
+  /* motion */
+  --ease: cubic-bezier(0.25, 1, 0.5, 1); /* ease-out-quart */
+  --dur-1: 150ms;
+  --dur-2: 250ms;
+
+  /* z-index scale */
+  --z-canvas-overlay: 10;
+  --z-rail: 20;
+  --z-banner: 30;
+  --z-popover: 40;
+  --z-modal: 45;
+  --z-toast: 50;
+  --z-tooltip: 60;
+
+  --shadow-pop: 0 8px 24px oklch(0.1 0.01 265 / 0.55), 0 0 0 1px var(--line);
+}

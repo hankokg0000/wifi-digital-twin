@@ -1,9 +1,10 @@
-import { test, expect, snapshot, clickWorld, grid } from './helpers';
+import { test, expect, snapshot, clickWorld, grid, edit } from './helpers';
 
 // Free space right of the house (house footprint is x 0–10, z 0–12).
 const FREE_X = 12;
 
 test('wall tool draws a snapped chain and Escape ends it', async ({ app: page }) => {
+  await edit(page);
   const before = await snapshot(page);
 
   await page.keyboard.press('w');
@@ -26,6 +27,7 @@ test('wall tool draws a snapped chain and Escape ends it', async ({ app: page })
 });
 
 test('wall tool snaps to an existing endpoint within 0.25 m', async ({ app: page }) => {
+  await edit(page);
   await page.keyboard.press('w');
   await clickWorld(page, FREE_X, 1);
   await clickWorld(page, FREE_X, 4);

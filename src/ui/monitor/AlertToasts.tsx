@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TriangleAlert, X } from 'lucide-react';
 import type { Alert } from '../../core';
 import { useSceneStore } from '../store';
 import { useAlerts } from '../useAlerts';
@@ -9,15 +10,13 @@ interface ToastItem {
 }
 
 const COALESCE_WINDOW_MS = 1000;
-const COALESCE_THRESHOLD = 3; // more than this many in the window get folded into a summary
-const AUTO_DISMISS_MS = 4000; // warnings auto-dismiss; critical toasts stay until closed
+const COALESCE_THRESHOLD = 3; // more than this many in the window fold into a summary
+const AUTO_DISMISS_MS = 3000;
 
 /**
- * Bottom-right transient toasts for alerts the sim clock crosses WHILE PLAYING (not while
- * scrubbing/jumping — AlertsPanel already offers a deliberate jump). Watches the store's
- * (throttled ~10 Hz) sim.t and fires for every alert whose time falls in (prevT, t]. More than
- * `COALESCE_THRESHOLD` firing within `COALESCE_WINDOW_MS` collapse into one summary toast so a
- * burst of falls/zone-entries doesn't carpet the screen.
+ * Bottom-right transient toasts for WARNINGS the sim clock crosses while playing. Criticals do
+ * not toast — they get the pinned banner and the feed. Fires for each alert whose time falls in
+ * (prevT, t]; bursts collapse into one summary.
  */
 export function AlertToasts() {
   const simT = useSceneStore((s) => s.sim.t);
@@ -33,7 +32,7 @@ export function AlertToasts() {
     lastTRef.current = simT;
     if (!playing || simT <= prevT) return;
 
-    const crossed = alerts.filter((a) => a.t > prevT && a.t <= simT);
+    const crossed = alerts.filter((a) => a.severity === 'warning' && a.t > prevT && a.t <= simT);
     if (crossed.length === 0) return;
 
     const now = Date.now();
@@ -46,34 +45,35 @@ export function AlertToasts() {
       }
       const id = `${alert.id}:${now}`;
       setToasts((prev) => [...prev, { id, alert }]);
-      if (alert.severity !== 'critical') {
-        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), AUTO_DISMISS_MS);
-      }
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), AUTO_DISMISS_MS);
     }
   }, [simT, playing, alerts]);
 
-  function dismiss(id: string) {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }
+  useEffect(() => {
+    if (coalescedCount === 0) return;
+    const t = setTimeout(() => setCoalescedCount(0), AUTO_DISMISS_MS);
+    return () => clearTimeout(t);
+  }, [coalescedCount]);
 
   if (toasts.length === 0 && coalescedCount === 0) return null;
 
   return (
-    <div className="alert-toasts">
+    <div className="warn-toasts" role="status">
       {toasts.map(({ id, alert }) => (
-        <div key={id} className={`alert-toast alert-toast-${alert.severity}`}>
-          <span className="alert-icon">{alert.severity === 'critical' ? '🚨' : '⚠️'}</span>
+        <div key={id} className="warn-toast">
+          <TriangleAlert size={16} strokeWidth={1.5} />
           <span>{alert.message}</span>
-          <button className="alert-toast-close" onClick={() => dismiss(id)} aria-label="dismiss">
-            &times;
+          <button className="icon-btn" aria-label="ปิด" onClick={() => setToasts((p) => p.filter((t) => t.id !== id))}>
+            <X size={14} strokeWidth={1.5} />
           </button>
         </div>
       ))}
       {coalescedCount > 0 && (
-        <div className="alert-toast alert-toast-warning">
+        <div className="warn-toast">
+          <TriangleAlert size={16} strokeWidth={1.5} />
           <span>+{coalescedCount} แจ้งเตือนเพิ่มเติม</span>
-          <button className="alert-toast-close" onClick={() => setCoalescedCount(0)} aria-label="dismiss">
-            &times;
+          <button className="icon-btn" aria-label="ปิด" onClick={() => setCoalescedCount(0)}>
+            <X size={14} strokeWidth={1.5} />
           </button>
         </div>
       )}
