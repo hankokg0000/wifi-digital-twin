@@ -36,6 +36,10 @@ function reconcileView(
   };
 }
 
+// `apply(..., { coalesce })`: edits with the same key close together share one undo entry.
+const COALESCE_WINDOW_MS = 800;
+let lastCoalesce: { key: string; at: number } | null = null;
+
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleAutosave(doc: SceneDoc) {
   if (autosaveTimer) clearTimeout(autosaveTimer);
@@ -55,11 +59,19 @@ export const createDocSlice =
     past: [],
     future: [],
 
-    apply: (fn) => {
+    apply: (fn, opts) => {
       const { doc, past } = get();
       try {
         const next = fn(doc);
-        const nextPast = [...past, doc].slice(-HISTORY_CAP);
+        const now = Date.now();
+        const fold =
+          opts?.coalesce !== undefined &&
+          lastCoalesce !== null &&
+          lastCoalesce.key === opts.coalesce &&
+          now - lastCoalesce.at < COALESCE_WINDOW_MS &&
+          past.length > 0;
+        lastCoalesce = opts?.coalesce !== undefined ? { key: opts.coalesce, at: now } : null;
+        const nextPast = fold ? past : [...past, doc].slice(-HISTORY_CAP);
         set({ doc: next, past: nextPast, future: [], ...reconcileView(next, get()) });
         scheduleAutosave(next);
       } catch (e) {
@@ -129,6 +141,7 @@ export const createDocSlice =
     undo: () => {
       const { past, doc, future } = get();
       if (past.length === 0) return;
+      lastCoalesce = null;
       const prev = past[past.length - 1]!;
       set({
         doc: prev,
@@ -142,6 +155,7 @@ export const createDocSlice =
     redo: () => {
       const { future, doc, past } = get();
       if (future.length === 0) return;
+      lastCoalesce = null;
       const next = future[0]!;
       set({
         doc: next,

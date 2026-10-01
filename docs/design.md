@@ -254,7 +254,7 @@ PL(d) = FSPL(1 m, f) + 10·n·log10(d)
         + Σ loss(agents ที่ ray ทะลุ)
         + N_floors · loss(slab)
 
-FSPL(1 m, f) = 20·log10(f_MHz) − 27.55      // 2.4 GHz ≈ 40.0 dB, 5.5 GHz ≈ 47.3 dB
+FSPL(1 m, f) = 20·log10(f_MHz) − 27.55      // 2437 MHz ≈ 40.2 dB, 5500 MHz ≈ 47.3 dB
 RSSI = txPower + gainTx + gainRx − PL
 ```
 
@@ -269,6 +269,30 @@ RSSI = txPower + gainTx + gainRx − PL
 - บ้าน 15×12 m ≈ 2,900 cell/level/AP × ~150 wall segment → เร็วพอสำหรับ real-time ใน worker
 - Output: `Float32Array` RSSI → texture บนพื้นแต่ละชั้น ใช้ colormap แบบ perceptually uniform
 - คำนวณใหม่เมื่อ layout/radio เปลี่ยน ส่วน agents ที่เคลื่อนที่ recompute เฉพาะ cell ที่ ray ผ่านใกล้ agent (optimization ทำทีหลังถ้าช้า)
+
+### สิ่งที่ implement แล้ว (Phase 1) — `src/core/rf/`, `src/ui/rf/`
+
+**Link trace** (`traceLink(doc, tx, rx, band, agents)`): คืน `pathLossDb`, `distance` และรายการสิ่งกีดขวาง (`wall | opening | object | agent | slab`, ชื่อภาษาไทย, dB) — RSSI คำนวณที่ผู้เรียก: `rssiDbm(txPower, gainTx, PL)` (rx 0 dBi, clamp ที่ −100 dBm)
+
+- ความถี่กลางต่อ band: 2.4 → 2437 MHz, 5 → 5500 MHz; `n = 2.0`; ระยะต่ำสุด 0.5 m
+- **Wall/Opening**: ตัด segment 2D ของเส้นตรง tx→rx กับเส้นกลางกำแพงของ *ทุก level ที่ ray ผ่านช่วงความสูงของมัน* แล้วเช็กความสูงของ ray ณ จุดตัดว่าอยู่ใน `0..wall.height` ถ้าจุดตัดตกในช่วง `offset..offset+width` ของ opening และความสูงอยู่ใน `sill..sill+height` → เปิด = 0 dB, ปิด = loss ของวัสดุ opening (แทน loss ของ wall) ไม่งั้นใช้ loss ของ wall; wall หนึ่งตัวนับครั้งเดียว
+- **Wall junction**: ray ที่ผ่านมุม/รอยต่อพอดีจะตัดหลาย wall ที่จุดเดียวกัน (ห่างกันไม่ถึง 3 cm ตามแนว ray) นับเป็นการทะลุครั้งเดียว เอาตัวที่ loss สูงสุด ไม่งั้นจะเกิดเส้นแนวทแยงสว่าง/มืดบน heatmap
+- **Object**: ray ตัดสี่เหลี่ยมฐานที่หมุนแล้ว (slab method ในกรอบของ object) และช่วงความสูงของ ray ขณะอยู่เหนือฐานต้องซ้อนกับ `[base, base + size.y]` (`position.y` คือความสูงฐาน ตาม ObjectMesh) → loss ของวัสดุนับครั้งเดียว
+- **Agent**: ray ชนวงกลม (radius) ที่จุดใกล้ที่สุด + ความสูง ray ≤ ความสูงตัว agent เหนือพื้น (ล้ม = 0.3 m) → loss ของ `human-body` (คน 4 / 5 GHz 6 dB; สัตว์เลี้ยงเตี้ยเกินไปที่จะบัง ray ที่ 1.0 m)
+- **ข้ามชั้น (approximation)**: ไม่ได้โมเดลช่องบันได/เพดานแยก — ใช้ ray เส้นตรงเดียวใน 3D: ทดสอบ wall ของทุก level ที่ช่วงความสูงของ ray ผ่าน (ที่ความสูงจริงของ ray) + slab 1 ครั้งต่อ "พื้น level" ที่อยู่ระหว่างความสูง tx กับ rx (ใช้ `slabMaterialId` ของ level บน) ไม่มี diffraction ผ่านบันได จึงมองว่าชั้นบนได้สัญญาณจาก AP ชั้นล่างต่ำเกินจริงเล็กน้อย
+- ตัวเลขตรวจสอบ: FSPL 1 m = 40.2 dB (2.4) / 47.3 dB (5); LOS 5 m ที่ 20 dBm + 3 dBi บน 2.4 GHz = −31.2 dBm; มีผนังอิฐคั่น = −39.2 dBm; คนยืนบนเส้น = +4 dB (2.4) / +6 dB (5)
+
+**Heatmap** (`computeHeatmap`): grid 0.25 m, rx สูง 1.0 m, คำนวณเฉพาะ cell ที่จุดกึ่งกลางอยู่ใน polygon ของ room บน level นั้น (นอกห้อง = NaN / `bestRadio = −1`) `source: 'best'` = ค่าสูงสุดของ interface ใน band นั้นของทุก radio ที่ `role === 'ap'` (ทุกชั้น); ระบุ radio id = เฉพาะตัวนั้น ผลเป็น `Float32Array` ของ dBm + `Int16Array` ของ index radio ที่แรงที่สุด บ้านตัวอย่าง (2 ชั้น, ทั้งสองชั้น, `best`) ใช้เวลา ≈ 7 ms ใน Node
+
+**Room coverage** (`roomCoverage`): ต่อห้อง = ค่าเฉลี่ย (mean) และ p10 ของ dBm ในห้อง; quality จากค่าเฉลี่ย — ≥ −50 `excellent`, ≥ −67 `good`, ≥ −75 `fair`, ≥ −85 `poor`, ต่ำกว่านั้น `none` (ขอบล่างรวมอยู่ในชั้น)
+
+**Worker + UI**: คำนวณใน Web Worker (`heatmap.worker.ts` ผ่าน Comlink) — ส่งเฉพาะ request ล่าสุด (ระหว่างที่งานเก่ายังไม่เสร็จจะแค่ทำเครื่องหมายว่า dirty แล้วถ่าย snapshot ใหม่ ไม่ต่อคิว) เปลี่ยน doc/ชั้น/band/source คำนวณทันที; ระหว่างเล่น sim คำนวณใหม่ได้ไม่เกิน 4×/วินาที และเฉพาะตอนที่ agent ขยับจริง (คนที่เดินบังสัญญาณจึงเห็นผลสด) Layer เป็นระนาบ `DataTexture` ที่ floor + 0.03 m (opacity 0.75 ใน Plan, 0.6 ใน 3D; 3D แสดงเฉพาะชั้นที่เลือก) ตั้งค่า layer (เปิด/ปิด, band, source) อยู่ใน view slice — ไม่อยู่ใน doc ไม่ถูก undo/autosave
+
+**Colormap**: ไล่จาก indigo → น้ำเงิน → teal → mint โดยความสว่าง (OKLCH L) เพิ่มทีละขั้นตามสัญญาณ (−90 `0.30/0.10/280` · −75 `0.50/0.15/270` · −67 `0.62/0.13/240` · −55 `0.74/0.12/190` · −40 `0.90/0.08/165`) จึงอ่านออกแม้เป็นขาวดำและสำหรับคนตาบอดสี และ **ไม่ใช้แดง/เหลืองอำพัน** เพราะสงวนไว้สำหรับ alert (ดู `tokens.css`) LUT 256 ช่อง; ค่าที่เกิน −40 หรือต่ำกว่า −90 ถูก clamp ปลายสเกล
+
+**Hover probe** (Plan, Monitor และ Edit เมื่อใช้ Select): `traceLink` บน main thread ที่จุดเดียว แสดง RSSI ต่อ AP + รายการสิ่งกีดขวางของ link ที่แรงที่สุด (หรือของ AP ที่เลือกเป็น source)
+
+**AP Inspector**: สไลเดอร์ tx power 0–30 dBm ต่อ interface และ select ช่อง (2.4: 1–13, 5: 36–165) — heatmap ปรับตามทันที; การลากสไลเดอร์รวมเป็น undo ขั้นเดียว (`apply(fn, { coalesce })`)
 
 ### Material defaults (dB ต่อการทะลุหนึ่งครั้ง, ค่าประมาณ)
 
@@ -319,6 +343,8 @@ Payload เป็น JSON, `ts` เป็น ms epoch ห้าม estimator sub
 - **Done เมื่อ:** สร้างบ้าน 2 ชั้นประมาณ 8 ห้องได้ใน ~10 นาที, reload แล้วได้ scene เดิมแบบ byte-identical, core มี test ครอบ (de)serialize
 
 ### Phase 1 — Propagation + moving agents
+
+**สถานะ: เสร็จแล้ว** (heatmap + probe + room coverage + AP controls ใน Monitor/Edit; test ครอบ `src/core/rf/rf.test.ts`; heatmap ทั้งบ้านตัวอย่าง ≈ 7 ms ≪ 200 ms) ข้อแตกต่างจาก scope เดิม: debug view ของ link เป็น *hover* (ไม่ใช่คลิก) เปิด/ปิดประตูใน Edit (Space) แล้ว heatmap คำนวณใหม่ทันที — ข้อจำกัดของ model ดู §8/§11
 
 - Heatmap ต่อ AP และแบบ best-of-all-AP ต่อ level เลือก band ได้ (2.4 / 5 GHz)
 - คลิกจุดใดก็ได้แล้วดู RSSI + รายการสิ่งกีดขวางที่ ray ทะลุ (debug view)

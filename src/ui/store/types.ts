@@ -1,4 +1,4 @@
-import type { SceneDoc, Id, Vec2 } from '../../core';
+import type { SceneDoc, Id, Vec2, Band } from '../../core';
 
 export type Tool = 'select' | 'wall' | 'door' | 'window' | 'room' | 'object' | 'ap' | 'zone';
 export type ViewMode = 'plan' | '3d';
@@ -12,6 +12,14 @@ export interface FocusRequest {
   x: number;
   z: number;
   nonce: number;
+}
+
+/** WiFi signal layer settings. View state: not in the doc, not undo-tracked, not autosaved. */
+export interface HeatmapSettings {
+  enabled: boolean;
+  band: Band;
+  /** 'best' = strongest AP per point; otherwise a radio id. */
+  source: 'best' | Id;
 }
 
 export interface SimState {
@@ -31,7 +39,11 @@ export interface DocSlice {
   past: SceneDoc[];
   future: SceneDoc[];
 
-  apply: (fn: (d: SceneDoc) => SceneDoc) => void;
+  /**
+   * Apply a doc edit as one undo step. Edits sharing a `coalesce` key within ~0.8 s fold into the
+   * previous undo entry (dragging a slider is one step, not fifty).
+   */
+  apply: (fn: (d: SceneDoc) => SceneDoc, opts?: { coalesce?: string }) => void;
   /** Like `apply`, but for creation ops that return {doc, id}; auto-selects the new entity. */
   applyOp: (fn: (d: SceneDoc) => { doc: SceneDoc; id: Id }) => Id | null;
   loadDoc: (d: SceneDoc) => void;
@@ -60,6 +72,7 @@ export interface ViewSlice {
    * selected entity; the canvas controls are disabled while this is true.
    */
   cameraLocked: boolean;
+  heatmap: HeatmapSettings;
 
   /** Switching to Edit pauses the sim; switching either way resets tool/draft/selection. */
   setMode: (m: Mode) => void;
@@ -72,6 +85,7 @@ export interface ViewSlice {
   clearDraft: () => void;
   dismissError: () => void;
   setCameraLocked: (locked: boolean) => void;
+  setHeatmap: (patch: Partial<HeatmapSettings>) => void;
 }
 
 export interface SimSlice {

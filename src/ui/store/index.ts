@@ -5,7 +5,7 @@ import { createSimSlice } from './simSlice';
 import { createAlertSlice } from './alertSlice';
 import type { SceneState } from './types';
 
-export type { Tool, ViewMode, Mode, SimSpeed, SimState, Draft, SceneState } from './types';
+export type { Tool, ViewMode, Mode, SimSpeed, SimState, Draft, HeatmapSettings, SceneState } from './types';
 
 const initialDoc = loadInitialDoc();
 

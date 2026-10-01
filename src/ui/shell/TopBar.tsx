@@ -6,6 +6,7 @@ import { Segmented } from '../components/Segmented';
 import { Tooltip } from '../components/Tooltip';
 import { BrandMark } from './BrandMark';
 import { FileMenu } from './FileMenu';
+import { SignalControl } from './SignalControl';
 import './topbar.css';
 
 function StatusPills() {
@@ -101,6 +102,7 @@ export function TopBar() {
             { value: '3d', label: '3D' },
           ]}
         />
+        <SignalControl />
 
         <Tooltip label="โหลดบ้านตัวอย่าง เล่นเดโมที่ ×20">
           <button className="btn btn-primary demo-btn" onClick={startDemo} aria-label="เริ่มเดโม">

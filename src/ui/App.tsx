@@ -17,7 +17,12 @@ import { AlertToasts } from './monitor/AlertToasts';
 import { ToolPalette } from './edit/ToolPalette';
 import { EditLeftTabs } from './edit/EditLeftTabs';
 import { Inspector } from './inspector/Inspector';
+import { SignalPanel } from './monitor/SignalPanel';
+import { HeatmapDriver } from './rf/useHeatmap';
+import { HeatmapLegend } from './rf/HeatmapLegend';
+import { ProbeTooltip } from './rf/ProbeTooltip';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import './rf/rf.css';
 
 function MonitorRails() {
   const m = useMonitorModel();
@@ -28,6 +33,7 @@ function MonitorRails() {
         <div className="rail-scroll">
           <OccupantsPanel />
           <ZonesPanel />
+          <SignalPanel />
           <SimControls />
         </div>
       </Rail>
@@ -35,7 +41,9 @@ function MonitorRails() {
         <SceneCanvas />
         <LabelsOverlay />
         <CriticalBanner />
+        <HeatmapLegend />
         <Legend />
+        <ProbeTooltip />
         <AlertToasts />
       </main>
       <Rail side="right" label="การแจ้งเตือน" icon={Bell} badge={attention} badgeTone={m.criticalCount > 0 ? 'critical' : 'warning'}>
@@ -56,6 +64,8 @@ function EditRails() {
       <main className="canvas-area">
         <SceneCanvas />
         <LabelsOverlay />
+        <HeatmapLegend />
+        <ProbeTooltip />
       </main>
       <Rail side="right" label="Inspector" icon={SlidersHorizontal} autoOpenKey={selection}>
         <Inspector />
@@ -70,6 +80,7 @@ export function App() {
 
   return (
     <div className="app" data-mode={mode}>
+      <HeatmapDriver />
       <TopBar />
       {mode === 'monitor' ? <MonitorRails /> : <EditRails />}
       <Toast />

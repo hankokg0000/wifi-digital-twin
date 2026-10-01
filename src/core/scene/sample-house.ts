@@ -158,35 +158,35 @@ export function sampleHouse(): SceneDoc {
   doc = addObject(doc, {
     levelId: level1,
     name: 'โซฟา',
-    position: [2, 0.4, 4.5],
+    position: [2, 0, 4.5],
     size: [2.2, 0.8, 0.9],
     materialId: 'wood-furniture',
   }).doc;
   doc = addObject(doc, {
     levelId: level1,
     name: 'โต๊ะทานข้าว',
-    position: [8, 0.4, 1.5],
+    position: [8, 0, 1.5],
     size: [1.6, 0.75, 0.9],
     materialId: 'wood-furniture',
   }).doc;
   doc = addObject(doc, {
     levelId: level1,
     name: 'ตู้เย็น',
-    position: [9.3, 1.0, 4.7],
+    position: [9.3, 0, 4.7],
     size: [0.7, 1.8, 0.7],
     materialId: 'metal',
   }).doc;
   doc = addObject(doc, {
     levelId: level1,
     name: 'ตู้เหล็ก',
-    position: [8, 0.9, 10.5],
+    position: [8, 0, 10.5],
     size: [0.8, 1.8, 0.4],
     materialId: 'metal',
   }).doc;
   doc = addObject(doc, {
     levelId: level1,
     name: 'เตียงนอนห้องแขก',
-    position: [2, 0.3, 9.5],
+    position: [2, 0, 9.5],
     size: [1.9, 0.5, 1.4],
     materialId: 'wood-furniture',
   }).doc;
@@ -329,28 +329,28 @@ export function sampleHouse(): SceneDoc {
   doc = addObject(doc, {
     levelId: level2,
     name: 'ตู้เสื้อผ้า',
-    position: [1, 1.0, 6.2],
+    position: [1, 0, 6.2],
     size: [1.5, 2.0, 0.6],
     materialId: 'wood-furniture',
   }).doc;
   doc = addObject(doc, {
     levelId: level2,
     name: 'เตียงนอนใหญ่',
-    position: [2.5, 0.3, 2.5],
+    position: [2.5, 0, 2.5],
     size: [2.0, 0.5, 1.8],
     materialId: 'wood-furniture',
   }).doc;
   doc = addObject(doc, {
     levelId: level2,
     name: 'เตียงนอน 2',
-    position: [8.5, 0.3, 1.8],
+    position: [8.5, 0, 1.8],
     size: [1.9, 0.5, 1.4],
     materialId: 'wood-furniture',
   }).doc;
   doc = addObject(doc, {
     levelId: level2,
     name: 'เตียงนอน 3',
-    position: [8.5, 0.3, 5.8],
+    position: [8.5, 0, 5.8],
     size: [1.9, 0.5, 1.4],
     materialId: 'wood-furniture',
   }).doc;

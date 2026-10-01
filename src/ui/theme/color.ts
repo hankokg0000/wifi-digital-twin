@@ -10,8 +10,8 @@ function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
-/** OKLCH (L 0..1, C, h in degrees) -> `#rrggbb` (gamut-clipped). */
-export function oklchToHex(L: number, C: number, hDeg: number): string {
+/** OKLCH (L 0..1, C, h in degrees) -> sRGB bytes [r, g, b] (gamut-clipped). */
+export function oklchToRgb8(L: number, C: number, hDeg: number): [number, number, number] {
   const h = (hDeg * Math.PI) / 180;
   const a = C * Math.cos(h);
   const b = C * Math.sin(h);
@@ -24,8 +24,14 @@ export function oklchToHex(L: number, C: number, hDeg: number): string {
   const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
   const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
   const bl = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
-  const to8 = (x: number) => Math.round(linearToSrgb(x) * 255).toString(16).padStart(2, '0');
-  return `#${to8(r)}${to8(g)}${to8(bl)}`;
+  const to8 = (x: number) => Math.round(linearToSrgb(x) * 255);
+  return [to8(r), to8(g), to8(bl)];
+}
+
+/** OKLCH (L 0..1, C, h in degrees) -> `#rrggbb` (gamut-clipped). */
+export function oklchToHex(L: number, C: number, hDeg: number): string {
+  const [r, g, b] = oklchToRgb8(L, C, hDeg);
+  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** `#rrggbb` -> [L, C, h]. */

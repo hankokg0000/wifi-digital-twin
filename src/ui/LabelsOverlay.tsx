@@ -2,7 +2,9 @@ import { useCallback, type ReactNode } from 'react';
 import { CameraOff, Wifi } from 'lucide-react';
 import { useSceneStore } from './store';
 import { registerLabel, unregisterLabel } from './canvas/labels';
-import type { Vec2 } from '../core';
+import { useHeatmapStore } from './rf/heatmapStore';
+import { QUALITY_COLOR, QUALITY_ICON, fmtDbm } from './rf/quality';
+import type { Id, Vec2 } from '../core';
 
 /** Average of a room's polygon vertices, in the same [x, z] shape RoomMesh used for its label. */
 function centroid(polygon: Vec2[]): Vec2 {
@@ -13,6 +15,23 @@ function centroid(polygon: Vec2[]): Vec2 {
     z += p[1];
   }
   return [x / polygon.length, z / polygon.length];
+}
+
+/** Signal-bars glyph + mean dBm under a room's name, while the signal layer is on and the
+ * latest result is for this floor and band. Selects primitives so it only re-renders on change. */
+function RoomSignal({ roomId, levelId }: { roomId: Id; levelId: Id }) {
+  const band = useSceneStore((s) => s.heatmap.band);
+  const valid = useHeatmapStore((s) => s.heatmap?.levelId === levelId && s.heatmap.band === band);
+  const quality = useHeatmapStore((s) => s.coverage.find((c) => c.roomId === roomId)?.quality);
+  const mean = useHeatmapStore((s) => s.coverage.find((c) => c.roomId === roomId)?.meanDbm);
+  if (!valid || quality === undefined || mean === undefined) return null;
+  const Icon = QUALITY_ICON[quality];
+  return (
+    <span className="room-signal" style={{ color: QUALITY_COLOR[quality] }}>
+      <Icon size={13} strokeWidth={1.5} aria-hidden="true" />
+      <span className="mono">{fmtDbm(mean)}</span>
+    </span>
+  );
 }
 
 interface LabelDivProps {
@@ -53,6 +72,7 @@ export function LabelsOverlay() {
   const doc = useSceneStore((s) => s.doc);
   const activeLevelId = useSceneStore((s) => s.activeLevelId);
   const selection = useSceneStore((s) => s.selection);
+  const showSignal = useSceneStore((s) => s.heatmap.enabled);
 
   const level = doc.levels.find((l) => l.id === activeLevelId);
   if (!level) return null;
@@ -95,9 +115,12 @@ export function LabelsOverlay() {
       {rooms.map((room) => {
         const [cx, cz] = centroid(room.polygon);
         return (
-          <LabelDiv key={room.id} id={`room:${room.id}`} className="room-label" world={[cx, level.elevation + 0.05, cz]}>
-            {room.name}
-            {!room.cameraAllowed && <CameraOff size={13} strokeWidth={1.5} aria-label="ห้องส่วนตัว ไม่มีกล้อง" />}
+          <LabelDiv key={room.id} id={`room:${room.id}`} className={`room-label${showSignal ? ' room-label-heat' : ''}`} world={[cx, level.elevation + 0.05, cz]}>
+            <span className="room-label-name">
+              {room.name}
+              {!room.cameraAllowed && <CameraOff size={13} strokeWidth={1.5} aria-label="ห้องส่วนตัว ไม่มีกล้อง" />}
+            </span>
+            {showSignal && <RoomSignal roomId={room.id} levelId={level.id} />}
           </LabelDiv>
         );
       })}
@@ -119,7 +142,8 @@ export function LabelsOverlay() {
           key={radio.id}
           id={`radio:${radio.id}`}
           className="radio-label"
-          world={[radio.position[0], level.elevation + radio.position[1] + 0.22, radio.position[2]]}
+          // Sits 0.55 m toward the top of the plan so it does not cover the room label centred below it.
+          world={[radio.position[0], level.elevation + radio.position[1] + 0.22, radio.position[2] - 0.55]}
         >
           <Wifi size={13} strokeWidth={1.5} />
           {radio.name}

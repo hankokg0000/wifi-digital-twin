@@ -9,7 +9,8 @@
   background: var(--surface-1);
   border-bottom: 1px solid var(--line);
   position: relative;
-  z-index: var(--z-rail);
+  /* Above the canvas banner (--z-banner): the signal popover hangs from here into the canvas. */
+  z-index: var(--z-popover);
 }
 
 .topbar-left {
@@ -91,9 +92,21 @@
   min-height: 32px;
 }
 
+@media (max-width: 1439px) {
+  .pill-label,
+  .demo-label {
+    display: none;
+  }
+  .demo-btn {
+    padding: 0 var(--sp-2);
+  }
+  .topbar-right {
+    gap: var(--sp-2);
+  }
+}
+
 @media (max-width: 1279px) {
-  .brand-house,
-  .pill-label {
+  .brand-house {
     display: none;
   }
 }

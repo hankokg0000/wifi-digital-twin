@@ -9,6 +9,8 @@ import { SimClock } from './SimClock';
 import { AgentsLayer } from './AgentsLayer';
 import { StairsLayer } from './StairsLayer';
 import { CameraRig } from './CameraRig';
+import { HeatmapLayer } from './HeatmapLayer';
+import { ProbeController } from './ProbeController';
 import { houseBounds } from './bounds';
 
 /**
@@ -65,10 +67,12 @@ export function SceneCanvas() {
       <CameraRig bounds={bounds} floorY={floorY} centerY={centerY} />
 
       <LevelsRenderer bounds={bounds} />
+      <HeatmapLayer />
       <StairsLayer />
       <AgentsLayer />
       <SimClock />
       <LabelProjector />
+      <ProbeController />
       <SceneMatrixSync />
 
       {viewMode === '3d' && (

@@ -14,6 +14,7 @@ export const createViewSlice =
     draft: null,
     lastError: null,
     cameraLocked: false,
+    heatmap: { enabled: false, band: '2.4', source: 'best' },
 
     setMode: (m) => {
       if (m === 'edit') get().pause();
@@ -28,4 +29,5 @@ export const createViewSlice =
     clearDraft: () => set({ draft: null }),
     dismissError: () => set({ lastError: null }),
     setCameraLocked: (locked) => set({ cameraLocked: locked }),
+    setHeatmap: (patch) => set((s) => ({ heatmap: { ...s.heatmap, ...patch } })),
   });

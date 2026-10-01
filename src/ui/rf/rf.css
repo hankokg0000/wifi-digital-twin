@@ -1,0 +1,368 @@
+/* WiFi signal layer: top-bar control, legend, hover probe, rail panel, inspector sliders. */
+
+/* ---------- top-bar control ---------- */
+
+.rf-ctl {
+  position: relative;
+}
+
+.seg-btn-icon {
+  padding: 0 var(--sp-2);
+}
+
+.rf-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 340px;
+  padding: var(--sp-3);
+  background: var(--surface-1);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-pop);
+}
+
+.rf-pop-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+.rf-pop .seg-fill {
+  flex-wrap: wrap;
+}
+
+/* The top bar is tight below ~1600px: the toggle collapses to its icon (its tooltip names it). */
+@media (max-width: 1599px) {
+  .rf-label {
+    display: none;
+  }
+}
+
+/* ---------- legend ---------- */
+
+.heat-legend {
+  position: absolute;
+  left: var(--sp-3);
+  bottom: var(--sp-3);
+  z-index: var(--z-canvas-overlay);
+  width: 240px;
+  padding: var(--sp-2) var(--sp-3) var(--sp-2);
+  background: oklch(0.205 0.012 265 / 0.85);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+  pointer-events: none;
+}
+
+/* Monitor also shows the symbol legend (one row, ~38px) at the same corner: stack above it. */
+.app[data-mode='monitor'] .heat-legend {
+  bottom: calc(var(--sp-3) + 38px + var(--sp-2));
+}
+
+.heat-legend-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.heat-legend-head .mono {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.heat-scale {
+  margin: 0 var(--sp-2);
+}
+
+.heat-bar {
+  height: 10px;
+  border-radius: 3px;
+}
+
+.heat-ticks,
+.heat-words {
+  position: relative;
+  height: 16px;
+}
+
+.heat-ticks {
+  margin-top: 3px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.heat-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.heat-words span {
+  position: absolute;
+  top: 0;
+  text-align: center;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* ---------- hover probe ---------- */
+
+.probe {
+  position: absolute;
+  z-index: var(--z-banner);
+  width: 264px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-1);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-1);
+  pointer-events: none;
+}
+
+.probe-room {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: var(--fs-2);
+  font-weight: 600;
+}
+
+.probe-rows,
+.probe-obs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.probe-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.probe-name {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.probe-dbm {
+  color: var(--ink);
+}
+
+.probe-q {
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.probe-path {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.probe-path-head {
+  margin-bottom: 2px;
+  color: var(--ink-3);
+}
+
+.probe-obs li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  color: var(--ink-2);
+}
+
+.probe-clear,
+.probe-empty {
+  color: var(--ink-3);
+}
+
+/* ---------- room labels ---------- */
+
+.room-label {
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Over the colour ramp the grey label text would wash out: give it its own dark backing. */
+.room-label.room-label-heat {
+  padding: 3px 9px;
+  background: oklch(0.17 0.012 265 / 0.78);
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-shadow: none;
+}
+
+.room-label-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.room-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-1);
+}
+
+.room-signal svg {
+  color: inherit;
+}
+
+/* ---------- monitor rail panel ---------- */
+
+.signal-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: var(--sp-2);
+  color: var(--ink-2);
+}
+
+.signal-list {
+  list-style: none;
+  margin: 0 calc(var(--sp-2) * -1);
+  padding: 0;
+}
+
+.signal-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 76px;
+  align-items: center;
+  column-gap: var(--sp-3);
+  width: 100%;
+  min-height: 36px;
+  padding: 4px var(--sp-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-2);
+  color: var(--ink);
+  text-align: left;
+  transition: background var(--dur-1) var(--ease);
+}
+
+button.signal-row:hover {
+  background: var(--surface-2);
+}
+
+.signal-row.selected {
+  background: var(--accent-weak);
+}
+
+.signal-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-q {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+.signal-dbm {
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+  text-align: right;
+}
+
+.signal-skeleton {
+  grid-template-columns: 16px minmax(0, 1fr);
+  min-height: 36px;
+}
+
+.signal-bar-sk {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  animation: signal-pulse 1.2s var(--ease) infinite alternate;
+}
+
+.signal-sk-text {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+@keyframes signal-pulse {
+  to {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-bar-sk {
+    animation: none;
+  }
+}
+
+/* ---------- AP inspector ---------- */
+
+.iface-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+
+.iface-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.iface-channel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+}
+
+.iface-channel span {
+  flex: none;
+}
+
+.iface-card select {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 var(--sp-2);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  color: var(--ink);
+}
+
+.iface-power {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+}
+
+.iface-power input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.iface-power output {
+  color: var(--ink);
+  text-align: right;
+}

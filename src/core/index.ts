@@ -14,3 +14,7 @@ export * from './sim/sample';
 export * from './sim/world';
 export * from './sim/populate';
 export * from './alerts';
+export * from './rf/bands';
+export * from './rf/trace';
+export * from './rf/heatmap';
+export * from './rf/stats';
