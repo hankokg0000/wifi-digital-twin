@@ -1,6 +1,6 @@
 import { Toolbar } from './components/Toolbar';
-import { LeftPanel } from './components/LeftPanel';
-import { Inspector } from './components/Inspector';
+import { LeftPanel } from './panels/LeftPanel';
+import { Inspector } from './inspector/Inspector';
 import { Toast } from './components/Toast';
 import { SimBar } from './components/SimBar';
 import { AlertsPanel } from './components/AlertsPanel';

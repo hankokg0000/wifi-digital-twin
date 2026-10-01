@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { addRoom, addZone, removeEntity, toggleOpening, updateObject } from '../core';
+import { removeEntity, updateObject } from '../core';
 import { useSceneStore } from './store';
 import { findEntity } from './entityLookup';
+import { TOOL_HANDLERS, toolContextFromStore } from './tools';
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -9,7 +10,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
-/** Global keyboard shortcuts for tools, undo/redo, delete, rotate, and opening toggle. */
+/** Global keyboard shortcuts for tool switching, undo/redo, delete and rotate; tool-specific keys go through `TOOL_HANDLERS`. */
 export function useKeyboardShortcuts() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -38,34 +39,8 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      if (e.key === 'Enter' && store.tool === 'room' && store.draft?.kind === 'room-polygon') {
-        if (store.draft.points.length >= 3) {
-          const levelId = store.activeLevelId;
-          const points = store.draft.points;
-          store.applyOp((d) => addRoom(d, { levelId, polygon: points }));
-          store.clearDraft();
-        }
-        return;
-      }
-
-      if (e.key === 'Enter' && store.tool === 'zone' && store.draft?.kind === 'zone-polygon') {
-        if (store.draft.points.length >= 3) {
-          const levelId = store.activeLevelId;
-          const points = store.draft.points;
-          store.applyOp((d) => addZone(d, { levelId, polygon: points }));
-          store.clearDraft();
-        }
-        return;
-      }
-
-      if (e.key === ' ' && store.tool === 'select' && store.selection) {
-        const found = findEntity(store.doc, store.selection);
-        if (found?.kind === 'opening') {
-          e.preventDefault();
-          store.apply((d) => toggleOpening(d, store.selection!));
-        }
-        return;
-      }
+      // Tool-specific keys (Enter to close a room/zone polygon, Space to toggle an opening).
+      if (TOOL_HANDLERS[store.tool].onKey?.(toolContextFromStore(store), e)) return;
 
       if ((e.key === '[' || e.key === ']') && store.selection) {
         const found = findEntity(store.doc, store.selection);

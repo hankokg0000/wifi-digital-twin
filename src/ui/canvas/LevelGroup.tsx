@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Level, Vec2, Id } from '../../core';
-import { addWall, addOpening, addRoom, addObject, addRadio, addZone, updateObject, updateRadio } from '../../core';
 import { useSceneStore } from '../store';
+import { TOOL_HANDLERS, useSelectDrag, type ToolContext } from '../tools';
 import { WallMesh } from './WallMesh';
 import { OpeningMesh } from './OpeningMesh';
 import { RoomMesh } from './RoomMesh';
@@ -23,8 +23,6 @@ interface LevelGroupProps {
 /** Plan view slices walls at this height (m) so doors and windows read as gaps. */
 const PLAN_CUT_HEIGHT = 1.2;
 
-type DragState = { id: Id; kind: 'object' | 'radio'; position: [number, number, number] } | null;
-
 export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
   const doc = useSceneStore((s) => s.doc);
   const tool = useSceneStore((s) => s.tool);
@@ -36,11 +34,8 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
   const setDraft = useSceneStore((s) => s.setDraft);
   const apply = useSceneStore((s) => s.apply);
   const applyOp = useSceneStore((s) => s.applyOp);
-  const setCameraLocked = useSceneStore((s) => s.setCameraLocked);
 
   const [hoverPoint, setHoverPoint] = useState<Vec2 | null>(null);
-  const [drag, setDrag] = useState<DragState>(null);
-  const dragRef = useRef<DragState>(null);
 
   const walls = useMemo(() => doc.walls.filter((w) => w.levelId === level.id), [doc.walls, level.id]);
   const wallIds = useMemo(() => new Set(walls.map((w) => w.id)), [walls]);
@@ -73,58 +68,20 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
     [setSelection],
   );
 
-  const startDrag = useCallback(
-    (id: Id, kind: 'object' | 'radio', position: [number, number, number]) => (e: ThreeEvent<MouseEvent>) => {
-      e.stopPropagation();
-      // Lock the camera controls immediately: in plan view MapControls' left button pans, and
-      // in 3D OrbitControls' left button rotates, either of which would otherwise fight this drag.
-      setCameraLocked(true);
-      const next: DragState = { id, kind, position };
-      setDrag(next);
-      dragRef.current = next;
+  const { drag, startDrag, moveDrag } = useSelectDrag(walls);
 
-      // Coordinate updates arrive via the InteractionPlane's onPointerMove (handlePointerMove
-      // reads dragRef); pointerup (anywhere, since the cursor may not be over the plane) commits.
-      const onWindowPointerUp = () => {
-        window.removeEventListener('pointerup', onWindowPointerUp);
-        setCameraLocked(false);
-        const finalDrag = dragRef.current;
-        dragRef.current = null;
-        setDrag(null);
-        if (!finalDrag) return;
-        if (finalDrag.kind === 'object') {
-          apply((d) => updateObject(d, finalDrag.id, { position: finalDrag.position }));
-        } else {
-          apply((d) => updateRadio(d, finalDrag.id, { position: finalDrag.position }));
-        }
-      };
-      window.addEventListener('pointerup', onWindowPointerUp);
-    },
-    [apply, setCameraLocked],
+  const toolCtx = useMemo<ToolContext>(
+    () => ({ doc, levelId: level.id, walls, selection, draft, apply, applyOp, setDraft, setSelection }),
+    [doc, level.id, walls, selection, draft, apply, applyOp, setDraft, setSelection],
   );
 
   const handlePointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       const raw: Vec2 = [e.point.x, e.point.z];
-
-      if (dragRef.current) {
-        const snapped = computeSnap(raw, walls).point;
-        const y = dragRef.current.position[1];
-        const next: DragState = { ...dragRef.current, position: [snapped[0], y, snapped[1]] };
-        dragRef.current = next;
-        setDrag(next);
-        return;
-      }
-
-      if (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap' || tool === 'zone') {
-        setHoverPoint(computeSnap(raw, walls).point);
-      } else if (tool === 'door' || tool === 'window') {
-        setHoverPoint(raw);
-      } else {
-        setHoverPoint(null);
-      }
+      if (moveDrag(raw)) return;
+      setHoverPoint(TOOL_HANDLERS[tool].onMove?.(toolCtx, raw) ?? null);
     },
-    [tool, walls],
+    [tool, toolCtx, moveDrag],
   );
 
   const hoverWall = useMemo(() => {
@@ -135,85 +92,9 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
 
   const handleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
-      const raw: Vec2 = [e.point.x, e.point.z];
-
-      if (tool === 'select') {
-        setSelection(null);
-        return;
-      }
-
-      if (tool === 'wall') {
-        const snapped = computeSnap(raw, walls).point;
-        if (!draft || draft.kind !== 'wall-chain') {
-          setDraft({ kind: 'wall-chain', points: [snapped] });
-          return;
-        }
-        const last = draft.points[draft.points.length - 1]!;
-        applyOp((d) => addWall(d, { levelId: level.id, a: last, b: snapped }));
-        setDraft({ kind: 'wall-chain', points: [...draft.points, snapped] });
-        return;
-      }
-
-      if (tool === 'room') {
-        const snapped = computeSnap(raw, walls).point;
-        if (!draft || draft.kind !== 'room-polygon') {
-          setDraft({ kind: 'room-polygon', points: [snapped] });
-          return;
-        }
-        const first = draft.points[0]!;
-        const closeDist = Math.hypot(snapped[0] - first[0], snapped[1] - first[1]);
-        if (draft.points.length >= 3 && closeDist <= 0.25) {
-          applyOp((d) => addRoom(d, { levelId: level.id, polygon: draft.points }));
-          setDraft(null);
-          return;
-        }
-        setDraft({ kind: 'room-polygon', points: [...draft.points, snapped] });
-        return;
-      }
-
-      if (tool === 'door' || tool === 'window') {
-        const hw = findHoverWall(raw, walls);
-        if (!hw) return;
-        const wall = walls.find((w) => w.id === hw.wallId);
-        if (!wall) return;
-        const kind = tool;
-        const width = kind === 'door' ? 0.9 : 1.2;
-        const length = Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1]);
-        const offset = Math.min(Math.max(hw.offset - width / 2, 0), Math.max(length - width, 0));
-        applyOp((d) => addOpening(d, { wallId: hw.wallId, kind, offset }));
-        return;
-      }
-
-      if (tool === 'object') {
-        const snapped = computeSnap(raw, walls).point;
-        applyOp((d) => addObject(d, { levelId: level.id, position: [snapped[0], 0, snapped[1]] }));
-        return;
-      }
-
-      if (tool === 'ap') {
-        const snapped = computeSnap(raw, walls).point;
-        applyOp((d) => addRadio(d, { levelId: level.id, position: [snapped[0], 2.0, snapped[1]] }));
-        return;
-      }
-
-      if (tool === 'zone') {
-        const snapped = computeSnap(raw, walls).point;
-        if (!draft || draft.kind !== 'zone-polygon') {
-          setDraft({ kind: 'zone-polygon', points: [snapped] });
-          return;
-        }
-        const first = draft.points[0]!;
-        const closeDist = Math.hypot(snapped[0] - first[0], snapped[1] - first[1]);
-        if (draft.points.length >= 3 && closeDist <= 0.25) {
-          applyOp((d) => addZone(d, { levelId: level.id, polygon: draft.points }));
-          setDraft(null);
-          return;
-        }
-        setDraft({ kind: 'zone-polygon', points: [...draft.points, snapped] });
-        return;
-      }
+      TOOL_HANDLERS[tool].onClick?.(toolCtx, [e.point.x, e.point.z]);
     },
-    [tool, draft, walls, level.id, setDraft, setSelection, applyOp],
+    [tool, toolCtx],
   );
 
   const handleContextMenu = useCallback(
@@ -319,7 +200,7 @@ export function LevelGroup({ level, opacity, interactive }: LevelGroupProps) {
           />
         ))}
 
-      {interactive && hoverPoint && (tool === 'wall' || tool === 'room' || tool === 'object' || tool === 'ap' || tool === 'zone') && (
+      {interactive && hoverPoint && TOOL_HANDLERS[tool].snapIndicator && (
         <SnapIndicator point={hoverPoint} snappedToEndpoint={computeSnap(hoverPoint, walls).snappedToEndpoint} />
       )}
 
