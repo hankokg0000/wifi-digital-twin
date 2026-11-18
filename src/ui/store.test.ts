@@ -8,6 +8,8 @@ import {
   addLevel,
   addWall,
   removeLevel,
+  quickRoomDoc,
+  type Site,
   type SceneDoc,
 } from '../core';
 import type { Tool, ViewMode } from './store';
@@ -652,6 +654,104 @@ describe('useSceneStore', () => {
       const state = useSceneStore.getState();
       expect(state.doc.levels.length).toBe(levelCount + 1);
       expect(state.selection).toBe(id);
+    });
+  });
+
+  describe('7. Real (Live Link) mode', () => {
+    const KEY = 'wifi-digital-twin:scene-doc';
+    const site: Site = {
+      id: 'site-live',
+      name: 'Lab',
+      widthM: 8,
+      lengthM: 6,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      devices: { tx: [1, 2], rx: [5, 4] },
+      network: null,
+    };
+    let useSceneStore: any;
+    let setItem: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      setItem = vi.fn();
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem,
+        removeItem: () => {},
+        clear: () => {},
+      });
+      vi.resetModules();
+      const module = await import('./store');
+      useSceneStore = module.useSceneStore;
+    });
+
+    it('enterReal shows the site doc, sets reality real and mode monitor', () => {
+      useSceneStore.getState().setMode('edit');
+      expect(useSceneStore.getState().mode).toBe('edit');
+
+      const realDoc = quickRoomDoc(site, 36);
+      useSceneStore.getState().enterReal(realDoc);
+
+      const state = useSceneStore.getState();
+      expect(state.doc).toBe(realDoc);
+      expect(state.reality).toBe('real');
+      expect(state.mode).toBe('monitor');
+    });
+
+    it('exitReal restores the exact previous sim doc and its history lengths', () => {
+      const s = () => useSceneStore.getState();
+      s().apply((doc: SceneDoc) => ({ ...doc }));
+      s().apply((doc: SceneDoc) => ({ ...doc }));
+      s().undo();
+      const simDoc = s().doc;
+      expect(s().past.length).toBe(1);
+      expect(s().future.length).toBe(1);
+
+      s().enterReal(quickRoomDoc(site, 36));
+      s().exitReal();
+
+      expect(s().reality).toBe('sim');
+      expect(s().doc).toBe(simDoc);
+      expect(s().past.length).toBe(1);
+      expect(s().future.length).toBe(1);
+    });
+
+    it('while real, edits never schedule an autosave write', () => {
+      useSceneStore.getState().enterReal(quickRoomDoc(site, 36));
+
+      useSceneStore.getState().apply((doc: SceneDoc) => ({ ...doc }));
+      useSceneStore.getState().applyOp((doc: SceneDoc) => addLevel(doc, { name: 'Extra' }));
+      vi.advanceTimersByTime(5000);
+
+      expect(setItem.mock.calls.filter((c) => c[0] === KEY)).toEqual([]);
+    });
+
+    it('control: the same edit in sim mode does write the scene key after the debounce', () => {
+      useSceneStore.getState().apply((doc: SceneDoc) => ({ ...doc }));
+      vi.advanceTimersByTime(500);
+
+      expect(setItem.mock.calls.map((c) => c[0])).toEqual([KEY]);
+    });
+
+    it('setMode edit while real leaves mode monitor', () => {
+      useSceneStore.getState().enterReal(quickRoomDoc(site, 36));
+      useSceneStore.getState().setMode('edit');
+      expect(useSceneStore.getState().mode).toBe('monitor');
+    });
+
+    it('loadDoc while real ends in reality sim and shows the loaded doc', () => {
+      useSceneStore.getState().enterReal(quickRoomDoc(site, 36));
+      const next = createEmptyDoc();
+      useSceneStore.getState().loadDoc(next);
+
+      expect(useSceneStore.getState().reality).toBe('sim');
+      expect(useSceneStore.getState().doc).toBe(next);
+    });
+
+    it('loadSample while real ends in reality sim', () => {
+      useSceneStore.getState().enterReal(quickRoomDoc(site, 36));
+      useSceneStore.getState().loadSample();
+
+      expect(useSceneStore.getState().reality).toBe('sim');
     });
   });
 });

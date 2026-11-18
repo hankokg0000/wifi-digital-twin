@@ -38,6 +38,15 @@ export interface DocSlice {
   doc: SceneDoc;
   past: SceneDoc[];
   future: SceneDoc[];
+  /**
+   * 'real' = the screen shows a Site's Quick Room doc (derived, never autosaved); the sim doc and
+   * its history wait in `simStash`. Edit mode is unavailable while real.
+   */
+  reality: 'sim' | 'real';
+  simStash: { doc: SceneDoc; past: SceneDoc[]; future: SceneDoc[] } | null;
+  enterReal: (d: SceneDoc) => void;
+  replaceRealDoc: (d: SceneDoc) => void;
+  exitReal: () => void;
 
   /**
    * Apply a doc edit as one undo step. Edits sharing a `coalesce` key within ~0.8 s fold into the

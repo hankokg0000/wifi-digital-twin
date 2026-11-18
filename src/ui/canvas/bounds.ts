@@ -11,7 +11,7 @@ export interface Bounds {
   depth: number;
 }
 
-/** Footprint of everything walled-in across all levels; a sensible default for an empty doc. */
+/** Footprint of walls and radios (± 0.5 m) across all levels; a sensible default for an empty doc. */
 export function houseBounds(doc: SceneDoc): Bounds {
   let minX = Infinity;
   let maxX = -Infinity;
@@ -24,6 +24,12 @@ export function houseBounds(doc: SceneDoc): Bounds {
       minZ = Math.min(minZ, z);
       maxZ = Math.max(maxZ, z);
     }
+  }
+  for (const r of doc.radios) {
+    minX = Math.min(minX, r.position[0] - 0.5);
+    maxX = Math.max(maxX, r.position[0] + 0.5);
+    minZ = Math.min(minZ, r.position[2] - 0.5);
+    maxZ = Math.max(maxZ, r.position[2] + 0.5);
   }
   if (!Number.isFinite(minX)) {
     minX = 0;

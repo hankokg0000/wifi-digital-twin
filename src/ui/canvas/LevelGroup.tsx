@@ -31,6 +31,9 @@ export const MONITOR_3D_CUT_HEIGHT = 1.0;
 export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupProps) {
   const doc = useSceneStore((s) => s.doc);
   const tool = useSceneStore((s) => s.tool);
+  // A Site's Quick Room carries a watch-everything zone only so Observed alerts fire; drawing it
+  // would hatch the whole room like a restricted area.
+  const real = useSceneStore((s) => s.reality === 'real');
   const editing = useSceneStore((s) => s.mode) === 'edit';
   const viewMode = useSceneStore((s) => s.viewMode);
   const planStyle = viewMode === 'plan';
@@ -199,6 +202,7 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
       })}
 
       {(interactive || viewMode === '3d') &&
+        !real &&
         zones.map((zone) => (
           <ZoneMesh
             key={zone.id}

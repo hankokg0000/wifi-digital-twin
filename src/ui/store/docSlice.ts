@@ -58,6 +58,8 @@ export const createDocSlice =
     doc: initialDoc,
     past: [],
     future: [],
+    reality: 'sim',
+    simStash: null,
 
     apply: (fn, opts) => {
       const { doc, past } = get();
@@ -73,7 +75,7 @@ export const createDocSlice =
         lastCoalesce = opts?.coalesce !== undefined ? { key: opts.coalesce, at: now } : null;
         const nextPast = fold ? past : [...past, doc].slice(-HISTORY_CAP);
         set({ doc: next, past: nextPast, future: [], ...reconcileView(next, get()) });
-        scheduleAutosave(next);
+        if (get().reality === 'sim') scheduleAutosave(next);
       } catch (e) {
         if (e instanceof SceneOpError) {
           set({ lastError: e.message });
@@ -89,7 +91,7 @@ export const createDocSlice =
         const { doc: next, id } = fn(doc);
         const nextPast = [...past, doc].slice(-HISTORY_CAP);
         set({ doc: next, past: nextPast, future: [], ...reconcileView(next, { ...get(), selection: id }) });
-        scheduleAutosave(next);
+        if (get().reality === 'sim') scheduleAutosave(next);
         return id;
       } catch (e) {
         if (e instanceof SceneOpError) {
@@ -102,6 +104,7 @@ export const createDocSlice =
     },
 
     loadDoc: (d) => {
+      if (get().reality === 'real') get().exitReal();
       set({
         doc: d,
         past: [],
@@ -111,7 +114,51 @@ export const createDocSlice =
         draft: null,
         acknowledged: {},
       });
-      scheduleAutosave(d);
+      if (get().reality === 'sim') scheduleAutosave(d);
+    },
+
+    enterReal: (d) => {
+      const { reality, doc, past, future } = get();
+      // Already real: keep the original sim stash, just swap the shown doc.
+      const simStash = reality === 'real' ? get().simStash : { doc, past, future };
+      lastCoalesce = null;
+      get().pause();
+      get().resetTime();
+      set({
+        reality: 'real',
+        simStash,
+        doc: d,
+        past: [],
+        future: [],
+        mode: 'monitor',
+        tool: 'select',
+        selection: null,
+        activeLevelId: d.levels[0]?.id ?? '',
+        draft: null,
+      });
+    },
+
+    replaceRealDoc: (d) => {
+      if (get().reality !== 'real') return;
+      set({ doc: d, past: [], future: [], ...reconcileView(d, get()) });
+    },
+
+    exitReal: () => {
+      const { reality, simStash } = get();
+      if (reality !== 'real') return;
+      lastCoalesce = null;
+      if (!simStash) {
+        set({ reality: 'sim', simStash: null });
+        return;
+      }
+      set({
+        reality: 'sim',
+        simStash: null,
+        doc: simStash.doc,
+        past: simStash.past,
+        future: simStash.future,
+        ...reconcileView(simStash.doc, { ...get(), selection: null, draft: null }),
+      });
     },
 
     newDoc: () => {
@@ -149,7 +196,7 @@ export const createDocSlice =
         future: [doc, ...future].slice(0, HISTORY_CAP),
         ...reconcileView(prev, get()),
       });
-      scheduleAutosave(prev);
+      if (get().reality === 'sim') scheduleAutosave(prev);
     },
 
     redo: () => {
@@ -163,7 +210,7 @@ export const createDocSlice =
         past: [...past, doc].slice(-HISTORY_CAP),
         ...reconcileView(next, get()),
       });
-      scheduleAutosave(next);
+      if (get().reality === 'sim') scheduleAutosave(next);
     },
 
     canUndo: () => get().past.length > 0,

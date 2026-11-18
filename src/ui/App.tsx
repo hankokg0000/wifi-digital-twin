@@ -24,11 +24,13 @@ import { ProbeTooltip } from './rf/ProbeTooltip';
 import { useSensingStore } from './sensing/sensingStore';
 import { SensingPanel } from './sensing/SensingPanel';
 import { SensingDriver } from './sensing/SensingDriver';
+import { LiveDriver } from './live/LiveDriver';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import './rf/rf.css';
 
 function MonitorRails() {
   const m = useMonitorModel();
+  const real = useSceneStore((s) => s.reality === 'real');
   const observedActive = useSensingStore((st) => (st.observedActiveId ? 1 : 0));
   const attention = m.attention.length + observedActive;
   return (
@@ -36,10 +38,10 @@ function MonitorRails() {
       <Rail side="left" label="ในบ้านตอนนี้" icon={Users} badge={m.occupants.length}>
         <div className="rail-scroll">
           <SensingPanel />
-          <OccupantsPanel />
-          <ZonesPanel />
-          <SignalPanel />
-          <SimControls />
+          {!real && <OccupantsPanel />}
+          {!real && <ZonesPanel />}
+          {!real && <SignalPanel />}
+          {!real && <SimControls />}
         </div>
       </Rail>
       <main className="canvas-area">
@@ -47,14 +49,14 @@ function MonitorRails() {
         <LabelsOverlay />
         <CriticalBanner />
         <HeatmapLegend />
-        <Legend />
+        {!real && <Legend />}
         <ProbeTooltip />
         <AlertToasts />
       </main>
       <Rail side="right" label="การแจ้งเตือน" icon={Bell} badge={attention} badgeTone={m.criticalCount > 0 ? 'critical' : 'warning'}>
-        <AlertsFeed />
+        <AlertsFeed forcedFilter={real ? 'observed' : undefined} />
       </Rail>
-      <Timeline />
+      {!real && <Timeline />}
     </>
   );
 }
@@ -82,11 +84,13 @@ function EditRails() {
 export function App() {
   useKeyboardShortcuts();
   const mode = useSceneStore((s) => s.mode);
+  const reality = useSceneStore((s) => s.reality);
 
   return (
-    <div className="app" data-mode={mode}>
+    <div className="app" data-mode={mode} data-reality={reality}>
       <HeatmapDriver />
       <SensingDriver />
+      <LiveDriver />
       <TopBar />
       {mode === 'monitor' ? <MonitorRails /> : <EditRails />}
       <Toast />

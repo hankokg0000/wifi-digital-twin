@@ -3,6 +3,8 @@ import { useSceneStore } from '../store';
 import { useMonitorModel } from '../sim/useMonitorModel';
 import { startDemo } from '../demo';
 import { useSensingStore } from '../sensing/sensingStore';
+import { useLiveStore, setWantReal } from '../live/liveStore';
+import { activeSite } from '../../core';
 import { Segmented } from '../components/Segmented';
 import { Tooltip } from '../components/Tooltip';
 import { BrandMark } from './BrandMark';
@@ -55,24 +57,49 @@ export function TopBar() {
   const futureLen = useSceneStore((s) => s.future.length);
   const undo = useSceneStore((s) => s.undo);
   const redo = useSceneStore((s) => s.redo);
+  const real = useSceneStore((s) => s.reality === 'real');
+  const sites = useLiveStore((s) => s.sites);
+  const houseName = real ? (activeSite(sites)?.name ?? 'ยังไม่มีห้อง') : 'บ้านตัวอย่าง 2 ชั้น';
+
+  function pickSource(v: 'real' | 'sim') {
+    if (v === 'real' && sites === null) {
+      useSceneStore.setState({ lastError: 'ต้องรันด้วย pnpm dev' });
+      return;
+    }
+    setWantReal(v === 'real');
+  }
 
   return (
     <header className="topbar">
       <div className="topbar-left">
         <BrandMark />
         <span className="brand-name">WiFi Digital Twin</span>
-        <span className="brand-house">บ้านตัวอย่าง 2 ชั้น</span>
+        <span className="brand-house">{houseName}</span>
+        {/* Left, not centre: the right-hand cluster overflows into the centre column below ~1100px. */}
+        <Segmented
+          label="แหล่งข้อมูล"
+          value={real ? 'real' : 'sim'}
+          onChange={pickSource}
+          options={[
+            { value: 'real', label: 'ของจริง' },
+            { value: 'sim', label: 'จำลอง' },
+          ]}
+        />
       </div>
 
-      <Segmented
-        label="โหมด"
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: 'monitor', label: <><Eye size={16} strokeWidth={1.5} />Monitor</>, ariaLabel: 'Monitor' },
-          { value: 'edit', label: <><Pencil size={16} strokeWidth={1.5} />Edit</>, ariaLabel: 'Edit' },
-        ]}
-      />
+      <div className="topbar-center">
+      {!real && (
+        <Segmented
+          label="โหมด"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'monitor', label: <><Eye size={16} strokeWidth={1.5} />Monitor</>, ariaLabel: 'Monitor' },
+            { value: 'edit', label: <><Pencil size={16} strokeWidth={1.5} />Edit</>, ariaLabel: 'Edit' },
+          ]}
+        />
+      )}
+      </div>
 
       <div className="topbar-right">
         {mode === 'monitor' && <StatusPills />}
@@ -115,7 +142,7 @@ export function TopBar() {
             <span className="demo-label">เริ่มเดโม</span>
           </button>
         </Tooltip>
-        <FileMenu />
+        {!real && <FileMenu />}
       </div>
     </header>
   );

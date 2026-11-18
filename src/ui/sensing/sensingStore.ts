@@ -332,6 +332,9 @@ export function backToLive(): void {
 
 /* ---------------- SSE connection ---------------- */
 
+/** Extra named SSE events other stores want (assigned on module load; avoids import cycles). */
+export const sseHandlers: { sites?: (d: unknown) => void } = {};
+
 /**
  * Connects to the dev server's /api/rssi/stream. EventSource reconnects by itself; while it is
  * down the connection shows 'offline'. Returns a disposer. Mount once (see <SensingDriver/>).
@@ -353,6 +356,13 @@ export function connectSensing(): () => void {
       set({ connection: mode === 'error' ? 'offline' : mode, fakeMotion: Boolean(fakeMotion) });
     } catch {
       /* ignore malformed status */
+    }
+  });
+  es.addEventListener('sites', (e) => {
+    try {
+      sseHandlers.sites?.(JSON.parse((e as MessageEvent<string>).data));
+    } catch {
+      /* ignore malformed sites */
     }
   });
   es.onmessage = (e) => {

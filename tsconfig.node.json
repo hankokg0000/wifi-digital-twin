@@ -13,5 +13,5 @@
     "noEmit": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["vite.config.ts", "vite-plugins"]
+  "include": ["vite.config.ts", "vite-plugins", "src/core/live/sites.ts"]
 }

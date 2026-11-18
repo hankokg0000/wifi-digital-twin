@@ -3,6 +3,7 @@ import { CircleDot, FolderOpen, Footprints, Radio, Square, Undo2 } from 'lucide-
 import { useSceneStore } from '../store';
 import { Section } from '../components/Section';
 import { SensingChart } from './SensingChart';
+import { LiveSetup } from '../live/LiveSetup';
 import {
   BASELINE_SECONDS,
   backToLive,
@@ -74,6 +75,7 @@ function StatusLine() {
 
 export function SensingPanel() {
   const doc = useSceneStore((s) => s.doc);
+  const real = useSceneStore((s) => s.reality === 'real');
   const connection = useSensingStore((s) => s.connection);
   const source = useSensingStore((s) => s.source);
   const baseline = useSensingStore((s) => s.baseline);
@@ -123,6 +125,7 @@ export function SensingPanel() {
   return (
     <Section title="ตรวจจับ WiFi" aside={<span className="sensing-badge">{replaying ? 'ของจริง · ย้อนหลัง' : 'ของจริง'}</span>}>
       <div className="sensing">
+        {real && <LiveSetup />}
         <ConnectionLine />
         <StatusLine />
         <SensingChart />

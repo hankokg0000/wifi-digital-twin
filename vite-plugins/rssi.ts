@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import type { ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
+import { createSitesStore, isLocalWrite } from './sites';
 
 /**
  * Dev-only plugin: streams this Mac's WiFi RSSI (via helper/mac-rssi) to the app as
@@ -52,6 +53,7 @@ export function rssiPlugin(): Plugin {
     configureServer(server) {
       const root = server.config.root;
       const clients = new Set<ServerResponse>();
+      const sites = createSitesStore(root);
       let helper: ChildProcess | null = null;
       let ping: ChildProcess | null = null;
       let fakeTimer: ReturnType<typeof setInterval> | null = null;
@@ -64,6 +66,7 @@ export function rssiPlugin(): Plugin {
         for (const c of clients) c.write(chunk);
       };
       const statusChunk = () => `event: status\ndata: ${JSON.stringify({ mode, fakeMotion, ...(message ? { message } : {}) })}\n\n`;
+      const sitesChunk = () => `event: sites\ndata: ${JSON.stringify(sites.get())}\n\n`;
       const setStatus = (m: Mode, msg?: string) => {
         mode = m;
         message = msg;
@@ -154,6 +157,7 @@ export function rssiPlugin(): Plugin {
         start(); // before adding this client: it gets the status line below instead
         clients.add(res);
         res.write(statusChunk());
+        res.write(sitesChunk());
         req.on('close', () => {
           clients.delete(res);
           if (clients.size === 0) scheduleIdleStop();
@@ -178,6 +182,53 @@ export function rssiPlugin(): Plugin {
             res.statusCode = 400;
             res.end();
           }
+        });
+      });
+
+      const MAX_SITES_BODY = 256 * 1024;
+      server.middlewares.use('/api/sites', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method === 'GET') {
+          res.end(JSON.stringify(sites.get()));
+          return;
+        }
+        if (req.method !== 'PUT') {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+        if (!isLocalWrite(req.headers)) {
+          res.statusCode = 403;
+          res.end();
+          return;
+        }
+        let body = '';
+        let size = 0;
+        let tooBig = false;
+        req.on('data', (d: Buffer) => {
+          size += d.length;
+          if (size > MAX_SITES_BODY) tooBig = true;
+          else body += d;
+        });
+        req.on('end', () => {
+          if (tooBig) {
+            res.statusCode = 413;
+            res.end();
+            return;
+          }
+          let saved: ReturnType<typeof sites.put> = null;
+          try {
+            saved = sites.put(JSON.parse(body));
+          } catch {
+            saved = null;
+          }
+          if (!saved) {
+            res.statusCode = 400;
+            res.end();
+            return;
+          }
+          res.end(JSON.stringify(saved));
+          send(sitesChunk());
         });
       });
 

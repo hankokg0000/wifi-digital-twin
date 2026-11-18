@@ -70,7 +70,7 @@ function Item({ item, simT, onAck }: { item: AlertItem; simT: number; onAck?: ()
 }
 
 /** Right rail "การแจ้งเตือน": unacknowledged first, then history. Acknowledging is UI state only. */
-export function AlertsFeed() {
+export function AlertsFeed({ forcedFilter }: { forcedFilter?: SourceFilter } = {}) {
   const { attention, history } = useMonitorModel();
   const simT = useSceneStore((s) => s.sim.t);
   const acknowledge = useSceneStore((s) => s.acknowledge);
@@ -83,7 +83,8 @@ export function AlertsFeed() {
   const doc = useSceneStore((s) => s.doc);
   const observed = useSensingStore((s) => s.observedAlerts);
   const activeId = useSensingStore((s) => s.observedActiveId);
-  const [filter, setFilter] = useState<SourceFilter>('all');
+  const [pickedFilter, setFilter] = useState<SourceFilter>('all');
+  const filter = forcedFilter ?? pickedFilter;
   const showSim = filter !== 'observed';
   const showObs = filter !== 'simulated';
   const simAttention = showSim ? attention : [];
@@ -98,7 +99,7 @@ export function AlertsFeed() {
         <h2 className="section-title">การแจ้งเตือน</h2>
         <span className="mono feed-count">{simAttention.length + simHistory.length + obsItems.length}</span>
       </header>
-      <div className="feed-filter">
+      {!forcedFilter && <div className="feed-filter">
         <Segmented
           fill
           label="กรองตามแหล่งที่มา"
@@ -110,7 +111,7 @@ export function AlertsFeed() {
             { value: 'observed', label: 'ของจริง' },
           ]}
         />
-      </div>
+      </div>}
       {empty ? (
         <div className="feed-empty">
           <ShieldCheck size={32} strokeWidth={1.5} />

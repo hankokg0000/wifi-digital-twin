@@ -16,6 +16,14 @@
     'time time time';
 }
 
+/* Real mode has no simulated timeline. */
+.app[data-mode='monitor'][data-reality='real'] {
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas:
+    'top top top'
+    'left canvas right';
+}
+
 .canvas-area {
   grid-area: canvas;
   position: relative;
