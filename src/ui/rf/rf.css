@@ -366,3 +366,17 @@ button.signal-row:hover {
   color: var(--ink);
   text-align: right;
 }
+
+/* Live Mirror: Observed (real WiFi) motion label on the Monitored Room. Accent, never alert hues. */
+.room-mirror {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: oklch(0.17 0.012 265 / 0.85);
+  color: var(--ink);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  white-space: nowrap;
+}

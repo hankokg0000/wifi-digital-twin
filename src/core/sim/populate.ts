@@ -11,9 +11,16 @@ import { getNavGrid, isFree, worldToCell } from './navgrid';
 const HORIZON_SECONDS = 3600;
 const MIN_FALL_SPACING = 300; // s, minimum gap between two falls for the same person
 
-const PERSON_NAMES = [
-  'สมชาย', 'สมศรี', 'มานี', 'ปิติ', 'ชูใจ', 'วีระ', 'ดวงใจ', 'ประเสริฐ', 'เก่ง', 'มาลี', 'สมหญิง', 'อรุณ',
-];
+const PERSON_NAMES = ['Alex', 'Emma', 'Noah', 'Olivia', 'Liam', 'Mia', 'Ethan', 'Sophia', 'Lucas', 'Ava', 'Ben', 'Chloe'];
+const CAT_NAMES = ['Milo', 'Luna', 'Oliver', 'Cleo'];
+const DOG_NAMES = ['Max', 'Bella', 'Charlie', 'Daisy'];
+
+/** n-th name from a pool; past the end it cycles with a numeric suffix ("Milo 2"). */
+function pickName(pool: readonly string[], n: number): string {
+  const base = pool[n % pool.length]!;
+  const round = Math.floor(n / pool.length);
+  return round === 0 ? base : `${base} ${round + 1}`;
+}
 // Agent categorical palette — hex equivalents of the UI tokens --person-1..8 (OKLCH L 0.75,
 // C 0.13, hues ~37-40 deg apart, skipping the 20-90 deg band reserved for critical/warning) and
 // --pet-1..4 (desaturated, C 0.045). Keep in sync with src/ui/theme/tokens.css.
@@ -32,6 +39,21 @@ function seqId(prefix: string, i: number): Id {
   return `${prefix}_${i.toString(36)}`;
 }
 
+/** The polygon of a zone: its linked room's, or its own. */
+function zonePoly(doc: SceneDoc, zoneRoomId: Id | undefined, own: Vec2[]): Vec2[] | null {
+  const poly = zoneRoomId !== undefined ? doc.rooms.find((r) => r.id === zoneRoomId)?.polygon : own;
+  return poly && poly.length >= 3 ? poly : null;
+}
+
+/** True if p (on levelId) is inside an enabled zone that restricts this kind of agent. */
+function inRestrictedZone(doc: SceneDoc, levelId: Id, kind: 'person' | 'pet', p: Vec2): boolean {
+  return doc.zones.some((z) => {
+    if (!z.enabled || z.levelId !== levelId || (z.appliesTo !== 'any' && z.appliesTo !== kind)) return false;
+    const poly = zonePoly(doc, z.roomId, z.polygon);
+    return poly !== null && pointInPolygon(p, poly);
+  });
+}
+
 /** Rejection-sample a free point anywhere on a level (not restricted to one room). */
 function randomFreePointOnLevel(doc: SceneDoc, levelId: Id, radius: number, kind: 'person' | 'pet', rng: () => number): Vec2 | null {
   const grid = getNavGrid(doc, levelId, radius, kind);
@@ -42,6 +64,7 @@ function randomFreePointOnLevel(doc: SceneDoc, levelId: Id, radius: number, kind
   for (let attempt = 0; attempt < 200; attempt++) {
     const p: Vec2 = [randRange(rng, grid.minX, maxX), randRange(rng, grid.minZ, maxZ)];
     if (rooms.length > 0 && !rooms.some((r) => pointInPolygon(p, r.polygon))) continue;
+    if (inRestrictedZone(doc, levelId, kind, p)) continue;
     const [col, row] = worldToCell(grid, p);
     if (isFree(grid, col, row)) return p;
   }
@@ -64,6 +87,7 @@ function randomFreePointInRoom(doc: SceneDoc, room: Room, radius: number, kind: 
   for (let attempt = 0; attempt < 200; attempt++) {
     const p: Vec2 = [randRange(rng, minX, maxX), randRange(rng, minZ, maxZ)];
     if (!pointInPolygon(p, room.polygon)) continue;
+    if (inRestrictedZone(doc, room.levelId, kind, p)) continue;
     const [col, row] = worldToCell(grid, p);
     if (isFree(grid, col, row)) return p;
   }
@@ -104,12 +128,15 @@ export function populate(doc: SceneDoc, settings: PopulationSettings, seed: numb
   const agents: Agent[] = [];
 
   for (let i = 0; i < settings.people; i++) {
-    const room = doc.rooms.length > 0 ? doc.rooms[Math.floor(rng() * doc.rooms.length)]! : null;
+    // Rooms that are wholly a restricted zone for people are never a spawn room.
+    const spawnRooms = doc.rooms.filter((r) => !doc.zones.some((z) => z.enabled && z.roomId === r.id && (z.appliesTo === 'any' || z.appliesTo === 'person')));
+    const candidates = spawnRooms.length > 0 ? spawnRooms : doc.rooms;
+    const room = candidates.length > 0 ? candidates[Math.floor(rng() * candidates.length)]! : null;
     const levelId = room?.levelId ?? groundLevelId;
     const p = room ? (randomFreePointInRoom(doc, room, 0.2, 'person', rng) ?? [0, 0]) : ([0, 0] as Vec2);
     agents.push({
       id: seqId('agent_p', i),
-      name: PERSON_NAMES[i % PERSON_NAMES.length]!,
+      name: pickName(PERSON_NAMES, i),
       kind: 'person',
       color: PERSON_COLORS[i % PERSON_COLORS.length]!,
       radius: 0.2,
@@ -125,7 +152,7 @@ export function populate(doc: SceneDoc, settings: PopulationSettings, seed: numb
   let dogCount = 0;
   for (let i = 0; i < settings.pets; i++) {
     const isCat = i % 2 === 0;
-    const name = isCat ? `แมว ${++catCount}` : `หมา ${++dogCount}`;
+    const name = isCat ? pickName(CAT_NAMES, catCount++) : pickName(DOG_NAMES, dogCount++);
     const p = randomFreePointOnLevel(doc, groundLevelId, 0.15, 'pet', rng) ?? ([0, 0] as Vec2);
     agents.push({
       id: seqId('agent_c', i),

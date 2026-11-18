@@ -558,15 +558,23 @@
   white-space: nowrap;
   pointer-events: none;
   user-select: none;
+  transition: opacity 140ms ease-out;
 }
 
+/* Lost a collision to a higher-priority label (see LabelProjector / resolveLabelOverlaps). */
+.labels-overlay > div.label-collided {
+  opacity: 0;
+}
+
+/* Room names are quiet context: smaller and muted, so people and alerts stay the loudest labels. */
 .room-label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--ink-2);
-  font-size: var(--fs-2);
+  color: var(--ink-3);
+  font-size: var(--fs-1);
   font-weight: 500;
+  letter-spacing: 0.01em;
   text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);
 }
 
@@ -579,21 +587,22 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
-  padding: 0 8px 0 7px;
-  background: var(--surface-1);
-  border: 1px solid var(--line);
+  height: 24px;
+  padding: 0 10px 0 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-3);
   border-radius: 999px;
   color: var(--ink);
-  font-size: var(--fs-1);
-  font-weight: 500;
+  font-size: var(--fs-2);
+  font-weight: 600;
+  box-shadow: 0 2px 8px oklch(0.1 0.01 265 / 0.55);
   /* sit above the agent, not on top of it */
-  margin-top: -26px;
+  margin-top: -28px;
 }
 
 .agent-pill-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   flex: none;
 }
@@ -650,5 +659,44 @@
 
 .text-critical {
   color: var(--critical-ink);
+  font-weight: 500;
+}
+
+/* ---------- alert source ---------- */
+
+.feed-filter {
+  flex: none;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.feed-meta > .src-badge::before {
+  content: none;
+}
+
+.src-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.src-badge-sim {
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+}
+
+.src-badge-obs {
+  border: 1px solid var(--accent);
+  background: var(--accent-weak);
+  color: var(--ink);
+}
+
+.feed-live {
+  color: var(--accent);
   font-weight: 500;
 }

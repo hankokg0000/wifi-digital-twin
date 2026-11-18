@@ -16,6 +16,9 @@ interface OpeningMeshProps {
   interactive: boolean;
   opacity: number;
   cutHeight?: number;
+  /** Draw plan symbols (top-down view) instead of 3D geometry. A finite `cutHeight` alone only
+   * clips: the 3D Monitor cutaway clips too but still draws doors and windows as 3D. */
+  planStyle?: boolean;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }
 
@@ -61,10 +64,10 @@ function WindowSymbol({ width, thickness, selected }: { width: number; thickness
   );
 }
 
-export function OpeningMesh({ wall, opening, color, selected, interactive, opacity, cutHeight = Infinity, onSelect }: OpeningMeshProps) {
+export function OpeningMesh({ wall, opening, color, selected, interactive, opacity, cutHeight = Infinity, planStyle = false, onSelect }: OpeningMeshProps) {
   const rotationY = useMemo(() => wallRotationY(wall), [wall]);
   if (opening.sill >= cutHeight) return null;
-  const plan = Number.isFinite(cutHeight);
+  const plan = planStyle;
   const top = Math.min(opening.sill + opening.height, cutHeight);
   const height = top - opening.sill;
   const mid = opening.offset + opening.width / 2;

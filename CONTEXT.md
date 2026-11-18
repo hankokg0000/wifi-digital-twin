@@ -58,6 +58,10 @@ _Avoid_: Real data (that is Observed Activity), label
 A period of recording a real Link's Readings while a tester records what is actually happening, used to score Observed Activity.
 _Avoid_: Experiment, run
 
+**Recording**:
+A saved series of a real Link's Readings that can be fed back through Motion Detection later (a Replay). Anything shown from a Replay is still Observed Activity, but must be labelled as replayed, never passed off as live.
+_Avoid_: Log, dump, mock data
+
 **Activity Mark**:
 A timestamped mark the tester enters during a Test Session ("walking", "still", "left the room"); the real-world counterpart of Ground Truth.
 _Avoid_: Label, annotation, ground truth (reserved for the simulator)

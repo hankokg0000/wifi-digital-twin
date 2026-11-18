@@ -21,16 +21,21 @@ import { SignalPanel } from './monitor/SignalPanel';
 import { HeatmapDriver } from './rf/useHeatmap';
 import { HeatmapLegend } from './rf/HeatmapLegend';
 import { ProbeTooltip } from './rf/ProbeTooltip';
+import { useSensingStore } from './sensing/sensingStore';
+import { SensingPanel } from './sensing/SensingPanel';
+import { SensingDriver } from './sensing/SensingDriver';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import './rf/rf.css';
 
 function MonitorRails() {
   const m = useMonitorModel();
-  const attention = m.attention.length;
+  const observedActive = useSensingStore((st) => (st.observedActiveId ? 1 : 0));
+  const attention = m.attention.length + observedActive;
   return (
     <>
       <Rail side="left" label="ในบ้านตอนนี้" icon={Users} badge={m.occupants.length}>
         <div className="rail-scroll">
+          <SensingPanel />
           <OccupantsPanel />
           <ZonesPanel />
           <SignalPanel />
@@ -81,6 +86,7 @@ export function App() {
   return (
     <div className="app" data-mode={mode}>
       <HeatmapDriver />
+      <SensingDriver />
       <TopBar />
       {mode === 'monitor' ? <MonitorRails /> : <EditRails />}
       <Toast />

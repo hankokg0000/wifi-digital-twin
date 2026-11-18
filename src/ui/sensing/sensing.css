@@ -1,0 +1,176 @@
+.sensing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sensing-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-weak);
+  color: var(--ink);
+  font-size: var(--fs-1);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sensing-conn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+}
+
+.sensing-conn-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sensing-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.sensing-dot.live {
+  background: var(--accent);
+}
+
+.sensing-dot.fake,
+.sensing-dot.replay {
+  background: transparent;
+  border: 1.5px solid var(--accent);
+}
+
+.sensing-dot.connecting {
+  background: var(--ink-3);
+  animation: sensing-blink 1s ease-in-out infinite;
+}
+
+.sensing-status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  font-size: var(--fs-5);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.sensing-status.idle {
+  color: var(--ink-2);
+}
+
+.sensing-status-hint {
+  font-size: var(--fs-2);
+  font-weight: 500;
+}
+
+.sensing-status.motion {
+  color: var(--accent);
+}
+
+.sensing-pulse {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: sensing-pulse 1.4s ease-in-out infinite;
+}
+
+.sensing-chart {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg);
+}
+
+.sensing-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.sensing-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+
+.sensing-progress {
+  position: relative;
+  overflow: hidden;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  font-size: var(--fs-1);
+}
+
+.sensing-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-weak);
+  transition: width 200ms linear;
+}
+
+.sensing-progress .mono {
+  position: relative;
+}
+
+.sensing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sensing-count {
+  color: var(--ink-3);
+}
+
+.sensing-error {
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+}
+
+@keyframes sensing-pulse {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes sensing-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sensing-pulse,
+  .sensing-dot.connecting {
+    animation: none;
+  }
+}

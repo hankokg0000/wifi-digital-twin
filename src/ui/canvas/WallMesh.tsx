@@ -15,14 +15,17 @@ interface WallMeshProps {
   interactive: boolean;
   opacity: number;
   cutHeight?: number;
+  /** Plan view: flat unlit walls. A finite `cutHeight` alone (3D Monitor cutaway) stays lit 3D. */
+  planStyle?: boolean;
   onSelect: (e: ThreeEvent<MouseEvent>) => void;
 }
 
-export function WallMesh({ wall, openings, color, selected, interactive, opacity, cutHeight, onSelect }: WallMeshProps) {
+export function WallMesh({ wall, openings, color, selected, interactive, opacity, cutHeight, planStyle = false, onSelect }: WallMeshProps) {
   const segments = useMemo(() => computeWallSegments(wall, openings, cutHeight), [wall, openings, cutHeight]);
   const rotationY = useMemo(() => wallRotationY(wall), [wall]);
   const tint = useMemo(() => wallTint(color), [color]);
-  const plan = cutHeight !== undefined;
+  const plan = planStyle;
+  const cutCap = useMemo(() => wallTint(color, 0.93), [color]);
 
   return (
     <group>
@@ -43,6 +46,13 @@ export function WallMesh({ wall, openings, color, selected, interactive, opacity
               <meshStandardMaterial color={tint} roughness={1} metalness={0} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
             )}
             {selected && <SelectionHull size={[length, height, wall.thickness]} />}
+            {/* Cut top in the 3D cutaway: a thin lighter cap so the slice reads as intentional. */}
+            {!plan && cutHeight !== undefined && seg.yEnd >= cutHeight - 1e-6 && wall.height > cutHeight && (
+              <mesh position={[0, height / 2 + 0.01, 0]}>
+                <boxGeometry args={[length, 0.02, wall.thickness]} />
+                <meshBasicMaterial color={cutCap} transparent={transparent} opacity={opacity} depthWrite={!transparent} />
+              </mesh>
+            )}
           </mesh>
         );
       })}

@@ -149,7 +149,7 @@ export function buildModel(
 
   const items: AlertItem[] = visible.map((alert) => {
     const agent = doc.agents.find((a) => a.id === alert.agentId);
-    const s = stateById.get(alert.agentId);
+    const s = alert.agentId === undefined ? undefined : stateById.get(alert.agentId);
     let active = false;
     if (s && agent) {
       if (alert.severity === 'critical') active = s.posture === 'fallen';

@@ -16,7 +16,7 @@ export type RfAgent = Pick<AgentState, 'position' | 'posture'> & { agentId: Id }
 export interface Obstruction {
   kind: 'wall' | 'opening' | 'object' | 'agent' | 'slab';
   id: Id;
-  /** Thai display name, e.g. "ผนังอิฐ", "ประตูไม้", "คน (สมชาย)". */
+  /** Thai display name, e.g. "ผนังอิฐ", "ประตูไม้", "คน (Alex)". */
   name: string;
   lossDb: number;
 }

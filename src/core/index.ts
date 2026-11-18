@@ -18,3 +18,4 @@ export * from './rf/bands';
 export * from './rf/trace';
 export * from './rf/heatmap';
 export * from './rf/stats';
+export * from './sensing';

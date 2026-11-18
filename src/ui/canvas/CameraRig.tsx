@@ -8,6 +8,8 @@ import type { Bounds } from './bounds';
 
 const FOCUS_MS = 250;
 const easeOutQuart = (x: number) => 1 - Math.pow(1 - x, 4);
+const easeInOutCubic = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const TRANSITION_MS = 520;
 
 /** Editing keeps free ground beside the house in view to draw on;
  * Monitor fits the house to the canvas, leaving room for the banner and legend. */
@@ -33,6 +35,10 @@ export function CameraRig({ bounds, floorY, centerY }: CameraRigProps) {
   const camera = useThree((s) => s.camera);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
   const anim = useRef<{ from: THREE.Vector3; to: THREE.Vector3; offset: THREE.Vector3; start: number } | null>(null);
+  // Smooth level-switch / Plan -> 3D transition: tweens camera position + orbit target.
+  const trans = useRef<{ fromPos: THREE.Vector3; toPos: THREE.Vector3; fromTarget: THREE.Vector3; toTarget: THREE.Vector3; start: number } | null>(null);
+  const last = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; view: 'plan' | '3d' } | null>(null);
+  const getState = useThree((s) => s.get);
 
   const editing = mode === 'edit';
   const cx = editing ? bounds.cx + EDIT_CENTER_SHIFT_X : bounds.cx;
@@ -78,9 +84,48 @@ export function CameraRig({ bounds, floorY, centerY }: CameraRigProps) {
     anim.current = { from: c.target.clone(), to, offset, start: performance.now() };
   }, [focus, camera]);
 
-  useFrame(() => {
-    const a = anim.current;
+  // When the level or view changes the camera props jump to their new defaults; rewind to the
+  // pose of the previous frame and ease to the new one (instant under reduced motion).
+  const prevKey = useRef<{ view: 'plan' | '3d'; centerY: number } | null>(null);
+  useEffect(() => {
+    const prev = prevKey.current;
+    prevKey.current = { view: viewMode, centerY };
+    const from = last.current;
     const c = controlsRef.current;
+    if (!prev || !from || !c || prefersReducedMotion()) return;
+    const changedLevel = viewMode === '3d' && prev.view === '3d' && prev.centerY !== centerY;
+    const enteredThreeD = viewMode === '3d' && prev.view === 'plan';
+    if (!changedLevel && !enteredThreeD) return;
+    const cam = getState().camera;
+    const toPos = cam.position.clone();
+    const toTarget = c.target.clone();
+    cam.position.copy(from.pos);
+    c.target.copy(from.target);
+    c.update();
+    trans.current = { fromPos: from.pos.clone(), toPos, fromTarget: from.target.clone(), toTarget, start: performance.now() };
+    anim.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a level/view change starts a transition
+  }, [viewMode, centerY, floorY]);
+
+  useFrame(() => {
+    const c = controlsRef.current;
+    const tr = trans.current;
+    if (tr && c) {
+      const p = Math.min((performance.now() - tr.start) / TRANSITION_MS, 1);
+      const e = easeInOutCubic(p);
+      c.target.lerpVectors(tr.fromTarget, tr.toTarget, e);
+      camera.position.lerpVectors(tr.fromPos, tr.toPos, e);
+      c.update();
+      if (p >= 1) trans.current = null;
+      return;
+    }
+    if (c) {
+      if (!last.current) last.current = { pos: new THREE.Vector3(), target: new THREE.Vector3(), view: viewMode };
+      last.current.pos.copy(camera.position);
+      last.current.target.copy(c.target);
+      last.current.view = viewMode;
+    }
+    const a = anim.current;
     if (!a || !c) return;
     const p = Math.min((performance.now() - a.start) / FOCUS_MS, 1);
     const e = easeOutQuart(p);

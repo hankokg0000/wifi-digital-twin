@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from 'react';
 import { CameraOff, Wifi } from 'lucide-react';
 import { useSceneStore } from './store';
 import { registerLabel, unregisterLabel } from './canvas/labels';
+import { useMonitoredRoomId, useSensingStore } from './sensing/sensingStore';
 import { useHeatmapStore } from './rf/heatmapStore';
 import { QUALITY_COLOR, QUALITY_ICON, fmtDbm } from './rf/quality';
 import type { Id, Vec2 } from '../core';
@@ -34,10 +35,21 @@ function RoomSignal({ roomId, levelId }: { roomId: Id; levelId: Id }) {
   );
 }
 
+/** Live Mirror label under the Monitored Room's name while Motion Detection says motion. */
+function RoomMirror({ roomId }: { roomId: Id }) {
+  const monitored = useMonitoredRoomId() === roomId;
+  const motion = useSensingStore((s) => monitored && s.verdict?.motion === true);
+  const replay = useSensingStore((s) => s.source === 'replay');
+  if (!motion) return null;
+  return <span className="room-mirror">{replay ? 'ของจริง · ย้อนหลัง · มีการเคลื่อนไหว' : 'ของจริง · มีการเคลื่อนไหว'}</span>;
+}
+
 interface LabelDivProps {
   id: string;
   className: string;
   world: [number, number, number];
+  /** Collision priority (see labels.ts): agent 3, monitored room / radio 2, room / zone 1. */
+  priority?: number;
   children: ReactNode;
 }
 
@@ -46,15 +58,15 @@ interface LabelDivProps {
  * registry on mount and whenever `world` changes, and unregisters on unmount. Starts hidden;
  * <LabelProjector> (inside <Canvas>) positions it and reveals it once it has a screen position.
  */
-function LabelDiv({ id, className, world, children }: LabelDivProps) {
+function LabelDiv({ id, className, world, priority = 1, children }: LabelDivProps) {
   const [wx, wy, wz] = world;
   const ref = useCallback(
     (el: HTMLDivElement | null) => {
-      if (el) registerLabel(id, el, [wx, wy, wz]);
+      if (el) registerLabel(id, el, [wx, wy, wz], priority);
       else unregisterLabel(id);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- id/wx/wy/wz fully describe `world`
-    [id, wx, wy, wz],
+    [id, wx, wy, wz, priority],
   );
 
   return (
@@ -73,6 +85,7 @@ export function LabelsOverlay() {
   const activeLevelId = useSceneStore((s) => s.activeLevelId);
   const selection = useSceneStore((s) => s.selection);
   const showSignal = useSceneStore((s) => s.heatmap.enabled);
+  const monitoredRoomId = useMonitoredRoomId();
 
   const level = doc.levels.find((l) => l.id === activeLevelId);
   if (!level) return null;
@@ -100,6 +113,7 @@ export function LabelsOverlay() {
             key={agent.id}
             id={`agent:${agent.id}`}
             className={`agent-pill${selection === agent.id ? ' label-selected' : ''}`}
+            priority={3}
             world={[agent.start.p[0], (startLevel?.elevation ?? 0) + agent.height + 0.15, agent.start.p[1]]}
           >
             <span className="agent-pill-dot" style={{ background: agent.color }} />
@@ -108,19 +122,20 @@ export function LabelsOverlay() {
         );
       })}
       {waypointsOnLevel.map(({ wp, i }) => (
-        <LabelDiv key={`wp:${selectedAgent!.id}:${i}`} id={`waypoint:${selectedAgent!.id}:${i}`} className="waypoint-label" world={[wp.p[0], level.elevation + 0.06, wp.p[1]]}>
+        <LabelDiv key={`wp:${selectedAgent!.id}:${i}`} id={`waypoint:${selectedAgent!.id}:${i}`} className="waypoint-label" priority={3} world={[wp.p[0], level.elevation + 0.06, wp.p[1]]}>
           {i + 1}
         </LabelDiv>
       ))}
       {rooms.map((room) => {
         const [cx, cz] = centroid(room.polygon);
         return (
-          <LabelDiv key={room.id} id={`room:${room.id}`} className={`room-label${showSignal ? ' room-label-heat' : ''}`} world={[cx, level.elevation + 0.05, cz]}>
+          <LabelDiv key={room.id} id={`room:${room.id}`} className={`room-label${showSignal ? ' room-label-heat' : ''}`} priority={monitoredRoomId === room.id ? 2 : 1} world={[cx, level.elevation + 0.05, cz]}>
             <span className="room-label-name">
               {room.name}
               {!room.cameraAllowed && <CameraOff size={13} strokeWidth={1.5} aria-label="ห้องส่วนตัว ไม่มีกล้อง" />}
             </span>
             {showSignal && <RoomSignal roomId={room.id} levelId={level.id} />}
+            <RoomMirror roomId={room.id} />
           </LabelDiv>
         );
       })}
@@ -142,6 +157,7 @@ export function LabelsOverlay() {
           key={radio.id}
           id={`radio:${radio.id}`}
           className="radio-label"
+          priority={2}
           // Sits 0.55 m toward the top of the plan so it does not cover the room label centred below it.
           world={[radio.position[0], level.elevation + radio.position[1] + 0.22, radio.position[2] - 0.55]}
         >

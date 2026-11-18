@@ -44,6 +44,12 @@ export function SceneCanvas() {
   const centerY = activeLevel ? activeLevel.elevation + activeLevel.height / 2 : 1.5;
   const floorY = activeLevel ? activeLevel.elevation : 0;
 
+  // Camera sits ~ radius / tan(fov/2) from the house (see CameraRig); keep the house itself clear of fog.
+  const houseRadius = Math.hypot(bounds.width, bounds.depth) / 2 + 0.5;
+  const camDist = houseRadius * 3.1;
+  const fogNear = camDist + houseRadius * 1.2;
+  const fogFar = camDist + houseRadius * 6;
+
   return (
     <Canvas
       flat
@@ -60,9 +66,12 @@ export function SceneCanvas() {
       }}
     >
       <color attach="background" args={[PALETTE.bg]} />
+      {/* Depth cue: distant ground fades into the background (3D only; starts beyond the house). */}
+      {viewMode === '3d' && <fog attach="fog" args={[PALETTE.bg, fogNear, fogFar]} />}
       <hemisphereLight args={['#e6e9f5', '#34384a', 1.5]} />
-      <directionalLight position={[10, 22, 8]} intensity={1.7} />
-      <directionalLight position={[-12, 10, -10]} intensity={0.35} />
+      <directionalLight position={[10, 22, 8]} intensity={2.0} />
+      {/* Cool rim light from behind-left: separates walls and people from the dark ground. */}
+      <directionalLight position={[-12, 9, -12]} intensity={0.6} color="#b4bdff" />
 
       <CameraRig bounds={bounds} floorY={floorY} centerY={centerY} />
 
@@ -79,10 +88,10 @@ export function SceneCanvas() {
         <ContactShadows
           position={[bounds.cx, floorY + 0.015, bounds.cz]}
           scale={Math.max(bounds.width, bounds.depth) + 8}
-          blur={2.2}
-          opacity={0.55}
-          far={2.4}
-          resolution={512}
+          blur={1.8}
+          opacity={0.7}
+          far={1.8}
+          resolution={768}
           color="#05060a"
         />
       )}

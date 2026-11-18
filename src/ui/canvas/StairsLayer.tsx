@@ -12,6 +12,8 @@ export function StairsLayer() {
   const selection = useSceneStore((s) => s.selection);
   const tool = useSceneStore((s) => s.tool);
   const setSelection = useSceneStore((s) => s.setSelection);
+  const monitor3d = useSceneStore((s) => s.viewMode === '3d' && s.mode === 'monitor');
+  const activeElevation = useSceneStore((s) => s.doc.levels.find((l) => l.id === s.activeLevelId)?.elevation ?? 0);
 
   return (
     <>
@@ -19,6 +21,8 @@ export function StairsLayer() {
         const fromLevel = doc.levels.find((l) => l.id === stair.fromLevelId);
         const toLevel = doc.levels.find((l) => l.id === stair.toLevelId);
         if (!fromLevel || !toLevel) return null;
+        // Monitor's 3D cutaway doesn't draw upper levels, so stairs that live wholly above are skipped.
+        if (monitor3d && Math.min(fromLevel.elevation, toLevel.elevation) > activeElevation) return null;
         const onClick =
           tool === 'select'
             ? (e: ThreeEvent<MouseEvent>) => {

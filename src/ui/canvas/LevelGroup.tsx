@@ -25,13 +25,16 @@ interface LevelGroupProps {
 
 /** Plan view slices walls at this height (m) so doors and windows read as gaps. */
 const PLAN_CUT_HEIGHT = 1.2;
+/** Monitor's 3D "dollhouse" cutaway: walls stop at this height so no wall hides a person. */
+export const MONITOR_3D_CUT_HEIGHT = 1.0;
 
 export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupProps) {
   const doc = useSceneStore((s) => s.doc);
   const tool = useSceneStore((s) => s.tool);
   const editing = useSceneStore((s) => s.mode) === 'edit';
   const viewMode = useSceneStore((s) => s.viewMode);
-  const cutHeight = viewMode === 'plan' ? PLAN_CUT_HEIGHT : undefined;
+  const planStyle = viewMode === 'plan';
+  const cutHeight = planStyle ? PLAN_CUT_HEIGHT : !editing ? MONITOR_3D_CUT_HEIGHT : undefined;
   const selection = useSceneStore((s) => s.selection);
   const draft = useSceneStore((s) => s.draft);
   const setSelection = useSceneStore((s) => s.setSelection);
@@ -127,6 +130,7 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
           interactive={selectable}
           opacity={opacity}
           cutHeight={cutHeight}
+          planStyle={planStyle}
           onSelect={select(wall.id)}
         />
       ))}
@@ -144,6 +148,7 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
             interactive={selectable}
             opacity={opacity}
             cutHeight={cutHeight}
+            planStyle={planStyle}
             onSelect={select(opening.id)}
           />
         );

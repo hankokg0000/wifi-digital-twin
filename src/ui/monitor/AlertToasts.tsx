@@ -3,6 +3,7 @@ import { TriangleAlert, X } from 'lucide-react';
 import type { Alert } from '../../core';
 import { useSceneStore } from '../store';
 import { useAlerts } from '../useAlerts';
+import { useSensingStore } from '../sensing/sensingStore';
 
 interface ToastItem {
   id: string;
@@ -48,6 +49,20 @@ export function AlertToasts() {
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), AUTO_DISMISS_MS);
     }
   }, [simT, playing, alerts]);
+
+  // Observed alerts toast the moment they are raised (they have no sim time to cross).
+  const observedCount = useSensingStore((s) => s.observedAlerts.length);
+  const seenObservedRef = useRef(observedCount);
+  useEffect(() => {
+    const seen = seenObservedRef.current;
+    seenObservedRef.current = observedCount;
+    if (observedCount <= seen) return;
+    const alert = useSensingStore.getState().observedAlerts[observedCount - 1];
+    if (!alert) return;
+    const id = `${alert.id}:toast`;
+    setToasts((prev) => [...prev, { id, alert }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), AUTO_DISMISS_MS + 2000);
+  }, [observedCount]);
 
   useEffect(() => {
     if (coalescedCount === 0) return;

@@ -11,9 +11,17 @@ export function focusAgent(agentId: Id, levelId: Id, x: number, z: number): void
 }
 
 /** Jump the sim to an alert (paused), select who it concerns, show their floor and pan to them. */
-export function jumpToAlert(alert: { t: number; agentId: Id; levelId: Id; position: [number, number, number] }): void {
+export function jumpToAlert(alert: { t: number; agentId?: Id; levelId: Id; position: [number, number, number] }): void {
   const s = useSceneStore.getState();
   s.pause();
   s.setTime(alert.t);
+  if (alert.agentId === undefined) return;
   focusAgent(alert.agentId, alert.levelId, alert.position[0], alert.position[2]);
+}
+
+/** Show a floor and pan to a point on it (used by Observed alerts, which concern a room, not an agent). */
+export function jumpToRoomLevel(levelId: Id, x: number, z: number): void {
+  const s = useSceneStore.getState();
+  if (s.activeLevelId !== levelId) s.setActiveLevelId(levelId);
+  s.requestFocus(x, z);
 }

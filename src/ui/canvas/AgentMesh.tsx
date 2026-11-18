@@ -12,11 +12,11 @@ function PersonBody({ radius, height, color }: { radius: number; height: number;
     <>
       <mesh position={[0, height / 2, 0]}>
         <capsuleGeometry args={[radius, bodyLength, 4, 12]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} roughness={0.55} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.55} />
       </mesh>
       <mesh position={[0, height + radius * 0.45, 0]}>
         <sphereGeometry args={[radius * 0.6, 16, 16]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} roughness={0.55} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.55} />
       </mesh>
       {/* Heading notch: local +z is "forward" (heading 0). */}
       <mesh position={[0, height * 0.6, radius + 0.07]} rotation={[Math.PI / 2, 0, 0]}>
@@ -35,11 +35,11 @@ function PetBody({ height, color }: { height: number; color: string }) {
     <>
       <mesh position={[0, diameter / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <capsuleGeometry args={[diameter / 2, Math.max(bodyLength - diameter, 0.05), 4, 12]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} roughness={0.6} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.6} />
       </mesh>
       <mesh position={[0, diameter / 2, bodyLength / 2 - 0.02]}>
         <sphereGeometry args={[diameter * 0.42, 14, 14]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} roughness={0.6} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.6} />
       </mesh>
     </>
   );
@@ -54,7 +54,7 @@ function FallenBody({ radius, color }: { radius: number; color: string }) {
     <group name="fallen" visible={false}>
       <mesh position={[0, radius, bodyLength / 2]} rotation={[Math.PI / 2, 0, 0]}>
         <capsuleGeometry args={[radius, bodyLength, 4, 12]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} roughness={0.55} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.55} />
       </mesh>
     </group>
   );
@@ -65,13 +65,14 @@ const ringGeo = (inner: number, outer: number) => new THREE.RingGeometry(inner, 
 /** Flat floor decoration: soft same-hue halo, accent selection ring, fallen alarm rings. All
  * meshes carry `userData.fx` so <AgentsLayer>'s ghost-opacity pass leaves them alone. */
 function FloorEffects({ radius, color, selected, isPerson, fallOffset }: { radius: number; color: string; selected: boolean; isPerson: boolean; fallOffset: number }) {
-  const halo = radius * 2.3;
+  const halo = radius * 3;
   const geos = useMemo(
     () => ({
       haloFill: new THREE.CircleGeometry(halo, 40),
       haloEdge: ringGeo(halo * 0.94, halo),
       selRing: ringGeo(halo * 1.12, halo * 1.28),
       alarm: ringGeo(0.96, 1),
+      pulse: ringGeo(0.94, 1),
     }),
     [halo],
   );
@@ -79,12 +80,16 @@ function FloorEffects({ radius, color, selected, isPerson, fallOffset }: { radiu
     <group name="floorfx" rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]}>
       <group name="halo">
         <mesh geometry={geos.haloFill} userData={{ fx: true }}>
-          <meshBasicMaterial color={color} transparent opacity={0.25} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.34} depthWrite={false} />
         </mesh>
         <mesh geometry={geos.haloEdge} userData={{ fx: true }}>
-          <meshBasicMaterial color={color} transparent opacity={0.55} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.7} depthWrite={false} />
         </mesh>
       </group>
+      {/* Soft expanding ring under a moving agent; <AgentsLayer> scales/fades it per frame. */}
+      <mesh name="pulse" geometry={geos.pulse} position={[0, 0, 0.001]} visible={false} userData={{ fx: true, haloRadius: halo }}>
+        <meshBasicMaterial color={color} transparent opacity={0} depthWrite={false} />
+      </mesh>
       {selected && (
         <mesh geometry={geos.selRing} position={[0, 0, 0.002]} userData={{ fx: true }}>
           <meshBasicMaterial color={PALETTE.accent} depthWrite={false} />

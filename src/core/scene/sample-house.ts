@@ -385,6 +385,16 @@ export function sampleHouse(): SceneDoc {
   // falls here (fallsPerHour: 0); one explicit fall is added below instead so the demo always
   // shows both fall alerts on the same, predictable person/time.
   // ==========================================================================
+  // The guest room is a watched Zone (appliesTo 'any' so WiFi Motion Detection may trigger it).
+  // It must exist BEFORE populate so nobody is spawned inside it.
+  doc = addZone(doc, {
+    levelId: level1,
+    roomId: rGuest.id,
+    name: 'ห้องนอนแขก (เฝ้าระวัง)',
+    appliesTo: 'any',
+    enabled: true,
+  }).doc;
+
   doc = populate(doc, { people: 3, pets: 1, fallsPerHour: 0 }, 42);
 
   const firstPerson = doc.agents.find((a) => a.kind === 'person')!;

@@ -10,14 +10,19 @@ import type { SceneDoc, Id, Vec2, Vec3, Zone } from '../scene/types';
 import { pointInPolygon } from '../scene/geometry';
 import type { WorldAgentState } from '../sim/world';
 
-export type AlertKind = 'zone-entry' | 'fall' | 'fall-no-recovery';
+export type AlertKind = 'zone-entry' | 'fall' | 'fall-no-recovery' | 'motion-in-zone';
+
+/** Where the evidence came from: the simulator (ground truth) or real WiFi Readings (Observed). */
+export type AlertSource = 'simulated' | 'observed';
 
 export interface Alert {
   id: string;
   t: number;
   kind: AlertKind;
+  source: AlertSource;
   severity: 'warning' | 'critical';
-  agentId: Id;
+  /** Who the alert concerns. Observed alerts (WiFi cannot tell who) have none. */
+  agentId?: Id;
   zoneId?: Id;
   levelId: Id;
   position: Vec3;
@@ -95,6 +100,7 @@ export function computeAlerts(doc: SceneDoc, stateAt: StateAt, horizon: number, 
             id: `zone:${zone.id}:${agent.id}:${t.toFixed(2)}`,
             t,
             kind: 'zone-entry',
+            source: 'simulated',
             severity: 'warning',
             agentId: agent.id,
             zoneId: zone.id,
@@ -116,6 +122,7 @@ export function computeAlerts(doc: SceneDoc, stateAt: StateAt, horizon: number, 
             id: `fall:${agent.id}:${t.toFixed(2)}`,
             t,
             kind: 'fall',
+            source: 'simulated',
             severity: 'critical',
             agentId: agent.id,
             levelId: state.levelId,
@@ -128,6 +135,7 @@ export function computeAlerts(doc: SceneDoc, stateAt: StateAt, horizon: number, 
             id: `fall-no-recovery:${agent.id}:${t.toFixed(2)}`,
             t,
             kind: 'fall-no-recovery',
+            source: 'simulated',
             severity: 'critical',
             agentId: agent.id,
             levelId: state.levelId,
