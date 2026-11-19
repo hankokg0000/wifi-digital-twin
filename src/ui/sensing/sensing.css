@@ -145,6 +145,12 @@
   color: var(--ink-3);
 }
 
+.sensing-hint {
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+  margin: 0;
+}
+
 .sensing-error {
   color: var(--ink-2);
   font-size: var(--fs-1);

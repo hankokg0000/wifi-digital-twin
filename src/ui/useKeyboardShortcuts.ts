@@ -3,6 +3,7 @@ import { removeEntity, updateObject } from '../core';
 import { useSceneStore } from './store';
 import { findEntity } from './entityLookup';
 import { TOOL_HANDLERS, toolContextFromStore } from './tools';
+import { cancelPlacement } from './live/liveStore';
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -18,6 +19,8 @@ export function useKeyboardShortcuts() {
 
       const store = useSceneStore.getState();
       const mod = e.metaKey || e.ctrlKey;
+
+      if (e.key === 'Escape') cancelPlacement();
 
       // Monitor mode only transports the sim; every editing shortcut belongs to Edit mode.
       if (store.mode === 'monitor') {

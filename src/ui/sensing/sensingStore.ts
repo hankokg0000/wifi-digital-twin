@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { useSceneStore } from '../store';
 import {
   DEFAULT_DETECTOR_CONFIG,
+  autoMonitoredRoomId,
   computeBaseline,
   createDetector,
+  liveLinkOf,
   type Alert,
   type Baseline,
   type Detector,
@@ -114,12 +116,24 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 const set = useSensingStore.setState;
 const get = useSensingStore.getState;
 
-/** The Monitored Room: the saved choice if it still exists, else "ห้องนอนแขก", else the first room. */
+/**
+ * The Monitored Room: the saved choice if it still exists, else (with a Live Link) the room the
+ * Link passes through longest, else "ห้องนอนแขก", else the first room.
+ */
 export function resolveMonitoredRoom(doc: SceneDoc, id: string | null) {
-  return doc.rooms.find((r) => r.id === id) ?? doc.rooms.find((r) => r.name === 'ห้องนอนแขก') ?? doc.rooms[0] ?? null;
+  const saved = doc.rooms.find((r) => r.id === id);
+  if (saved) return saved;
+  const link = liveLinkOf(doc);
+  if (link) {
+    const auto = autoMonitoredRoomId(doc.rooms, link.tx, link.rx);
+    const room = doc.rooms.find((r) => r.id === auto);
+    if (room) return room;
+  }
+  return doc.rooms.find((r) => r.name === 'ห้องนอนแขก') ?? doc.rooms[0] ?? null;
 }
 
-export function setMonitoredRoomId(id: string): void {
+/** null = automatic (clears the saved choice). */
+export function setMonitoredRoomId(id: string | null): void {
   save(ROOM_KEY, id);
   set({ monitoredRoomId: id });
 }

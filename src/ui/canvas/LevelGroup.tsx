@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { Level, Vec2, Id } from '../../core';
 import { useSceneStore } from '../store';
+import { PALETTE } from '../theme/palette';
 import { TOOL_HANDLERS, useSelectDrag, type ToolContext } from '../tools';
 import { WallMesh } from './WallMesh';
 import { OpeningMesh } from './OpeningMesh';
@@ -15,6 +16,9 @@ import type { Bounds } from './bounds';
 import { InteractionPlane } from './InteractionPlane';
 import { SnapIndicator, DraftChainPreview, OpeningPreview } from './Previews';
 import { computeSnap, findHoverWall } from './snapping';
+import { LiveLinkLayer } from './LiveLinkLayer';
+import { cancelPlacement, placePoint, useLiveStore } from '../live/liveStore';
+import { useLiveLink } from '../live/useLiveLink';
 
 interface LevelGroupProps {
   level: Level;
@@ -44,6 +48,10 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
   const setDraft = useSceneStore((s) => s.setDraft);
   const apply = useSceneStore((s) => s.apply);
   const applyOp = useSceneStore((s) => s.applyOp);
+
+  const placing = useLiveStore((s) => s.placing);
+  const draftTx = useLiveStore((s) => s.draftTx);
+  const link = useLiveLink();
 
   const [hoverPoint, setHoverPoint] = useState<Vec2 | null>(null);
 
@@ -115,12 +123,33 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
     [setDraft],
   );
 
+  // Real-mode device placement: the plane swallows the click so nothing else gets selected.
+  const placeClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    placePoint([e.point.x, e.point.z]);
+  }, []);
+  const placeContext = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.nativeEvent.preventDefault();
+    e.stopPropagation();
+    cancelPlacement();
+  }, []);
+  const noop = useCallback(() => {}, []);
+  const placingHere = real && placing !== null && interactive;
+
   return (
     <group position={[0, level.elevation, 0]}>
       {interactive && <GridFloor />}
       {viewMode === '3d' && <FloorSlab bounds={bounds} opacity={opacity} />}
       {editing && interactive && (
         <InteractionPlane onPointerMove={handlePointerMove} onClick={handleClick} onContextMenu={handleContextMenu} />
+      )}
+
+      {placingHere && !editing && <InteractionPlane onPointerMove={noop} onClick={placeClick} onContextMenu={placeContext} />}
+      {placingHere && draftTx && (
+        <mesh position={[draftTx[0], 0.08, draftTx[1]]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.18, 0.26, 24]} />
+          <meshBasicMaterial color={PALETTE.accent} transparent opacity={0.9} depthWrite={false} />
+        </mesh>
       )}
 
       {walls.map((wall) => (
@@ -167,6 +196,8 @@ export function LevelGroup({ level, opacity, interactive, bounds }: LevelGroupPr
           onSelect={select(room.id)}
         />
       ))}
+
+      {link && link.levelId === level.id && <LiveLinkLayer link={link} />}
 
       {objects.map((object) => {
         const isDragging = drag?.id === object.id;

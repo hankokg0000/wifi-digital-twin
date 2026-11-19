@@ -132,7 +132,8 @@ export function SensingPanel() {
 
         <label className="sensing-field">
           <span className="field-label">ห้องที่เฝ้า</span>
-          <select className="sensing-select" value={room?.id ?? ''} onChange={(e) => setMonitoredRoomId(e.target.value)} aria-label="ห้องที่เฝ้า">
+          <select className="sensing-select" value={doc.rooms.some((r) => r.id === roomId) ? roomId! : ''} onChange={(e) => setMonitoredRoomId(e.target.value || null)} aria-label="ห้องที่เฝ้า">
+            <option value="">อัตโนมัติ (ห้องที่เส้นผ่านยาวสุด)</option>
             {doc.rooms.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} · {levelName(r.levelId)}

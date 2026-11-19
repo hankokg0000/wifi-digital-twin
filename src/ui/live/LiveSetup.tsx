@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Crosshair, Plus } from 'lucide-react';
 import { ROOM_MAX_M, ROOM_MIN_M } from '../../core';
-import { activateSite, canWrite, createQuickRoom, READ_ONLY_HINT, useLiveStore } from './liveStore';
+import { activateSite, canWrite, cancelPlacement, createQuickRoom, READ_ONLY_HINT, startPlacement, useLiveStore } from './liveStore';
 
 function NewRoomForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
@@ -57,6 +57,7 @@ function NewRoomForm({ onDone }: { onDone: () => void }) {
 export function LiveSetup() {
   const sites = useLiveStore((s) => s.sites);
   const saveError = useLiveStore((s) => s.saveError);
+  const placing = useLiveStore((s) => s.placing);
   const [creating, setCreating] = useState(false);
   const writable = canWrite();
   const hint = writable ? undefined : READ_ONLY_HINT;
@@ -87,6 +88,27 @@ export function LiveSetup() {
         <button type="button" className="btn btn-block" onClick={() => setCreating(true)} disabled={!writable} title={hint}>
           <Plus size={16} strokeWidth={1.5} />
           ห้องใหม่
+        </button>
+      )}
+      {placing ? (
+        <>
+          <p className="sensing-hint" role="status">
+            {placing === 'tx' ? 'คลิกตำแหน่ง hotspot (Transmitter)' : 'คลิกตำแหน่ง Mac (Receiver)'}
+          </p>
+          <button type="button" className="btn btn-block" onClick={cancelPlacement}>
+            ยกเลิก
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-block"
+          onClick={startPlacement}
+          disabled={!writable || !sites?.activeSiteId}
+          title={hint}
+        >
+          <Crosshair size={16} strokeWidth={1.5} />
+          วางตำแหน่งอุปกรณ์
         </button>
       )}
       {saveError && <p className="sensing-error" role="alert">{saveError}</p>}

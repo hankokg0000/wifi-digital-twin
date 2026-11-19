@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { newSiteId, parseSitesFile, type Site, type SitesFile } from '../../core';
-import { sseHandlers } from '../sensing/sensingStore';
+import { activeSite, newSiteId, parseSitesFile, snapVec2, type Site, type SitesFile, type XZ } from '../../core';
+import { sseHandlers, useSensingStore } from '../sensing/sensingStore';
 
 /**
  * Live (real-world) deployment state: the shared Sites file mirrored from the dev server and this
@@ -26,12 +26,18 @@ interface LiveState {
   /** This browser's wish; after a reload we re-enter real once Sites arrive. */
   wantReal: boolean;
   saveError: string | null;
+  /** Click-to-place of the two devices on the plan: which one the next click sets. */
+  placing: null | 'tx' | 'rx';
+  /** First click (Transmitter), kept until the Receiver click completes the pair. */
+  draftTx: XZ | null;
 }
 
 export const useLiveStore = create<LiveState>()(() => ({
   sites: null,
   wantReal: loadWant(),
   saveError: null,
+  placing: null,
+  draftTx: null,
 }));
 
 const set = useLiveStore.setState;
@@ -99,4 +105,33 @@ export async function activateSite(id: string): Promise<void> {
   const cur = get().sites;
   if (!cur || cur.activeSiteId === id) return;
   await putSites({ ...cur, activeSiteId: id });
+}
+
+const PLACE_SNAP_M = 0.05;
+
+export function startPlacement(): void {
+  set({ placing: 'tx', draftTx: null });
+}
+
+export function cancelPlacement(): void {
+  if (get().placing === null && get().draftTx === null) return;
+  set({ placing: null, draftTx: null });
+}
+
+/** 1st click = hotspot (Transmitter), 2nd = Mac (Receiver); the pair is saved to the active Site. */
+export function placePoint(p: [number, number]): void {
+  const { placing, draftTx, sites } = get();
+  if (placing === null) return;
+  const q = snapVec2(p, PLACE_SNAP_M);
+  if (placing === 'tx') {
+    set({ draftTx: q, placing: 'rx' });
+    return;
+  }
+  const site = activeSite(sites);
+  set({ placing: null, draftTx: null });
+  if (!sites || !site || !draftTx) return;
+  // Gateway polling arrives with Phase 3; until then only the channel is recorded.
+  const channel = useSensingStore.getState().channel;
+  const next: Site = { ...site, devices: { tx: draftTx, rx: q }, network: { gateway: null, channel } };
+  void putSites({ ...sites, sites: sites.sites.map((s) => (s.id === site.id ? next : s)) });
 }
