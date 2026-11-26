@@ -72,7 +72,7 @@ Mounted in App beside SensingDriver. On mount GET /api/sites (fail → sites sta
 
 ### UI
 - TopBar: Segmented "แหล่งข้อมูล" (`real` "ของจริง" / `sim` "จำลอง") → setWantReal. If `sites === null` clicking ของจริง → toast "ต้องรันด้วย pnpm dev". In real: hide Monitor/Edit control; brand-house shows site name or "ยังไม่มีห้อง"; hide FileMenu.
-- App MonitorRails in real: hide OccupantsPanel, ZonesPanel, SimControls, Timeline; AlertsFeed `forcedFilter="observed"` and hide its filter control. "เริ่มเดโม" stays (leaves real via loadDoc).
+- App MonitorRails in real: hide OccupantsPanel, ZonesPanel, SimControls, Timeline; show WiFi sensing Alerts and hide the filter control. Simulated RSSI Alerts keep the “จำลอง” label. "เริ่มเดโม" stays (leaves real via loadDoc).
 - `src/ui/live/LiveSetup.tsx`: in SensingPanel above ConnectionLine when real. Site `<select>` → activateSite; "ห้องใหม่" → inline form name / กว้าง (m) / ยาว (m) (1–30, step 0.1) + สร้าง / ยกเลิก. Write buttons disabled when !canWrite() with title "แก้ได้เฉพาะเครื่องที่รันเดโม".
 - `src/ui/canvas/bounds.ts`: houseBounds also includes radio x/z ± 0.5 m.
 
@@ -102,7 +102,12 @@ LevelGroup: render InteractionPlane when `placing && interactive` (in addition t
 ### Rendering
 - `src/ui/canvas/LiveLinkLayer.tsx` rendered by LevelGroup when `link.levelId === level.id`. Band = shapeGeometry from coverageBand at y 0.05 (same −z trick as RoomMesh). Line = drei `<Line>` y 0.07 plan / 0.9 3D. Colour PALETTE.accent; useFrame eased material mutation (no React state). Connected idle: line opacity 0.5 width 2, band 0.08. Motion: line 1 / width 4, band 0.35 with sine pulse (static if reduced motion). Offline & not replaying: line ink3 dashed, band hidden.
 - `src/ui/live/useLiveLink.ts`: `useLiveLink()` (memo liveLinkOf(doc)), `useCrossedRoomIds(): Set<Id>`.
-- RoomMesh: with a Live Link, motion fill applies to every crossed room at opacity 0.12, no pulse (replaces monitored-room fill); monitored-room outline stays. No link → unchanged.
+- RoomMesh: with a Live Link, motion fill applies to every crossed room at opacity 0.12, no pulse; the Monitored Room outline stays. Without a Live Link, the fill stays on the Monitored Room.
+
+### Motion preview (approved follow-up)
+- Show a stationary 2D figure with a walking loop in a fixed slot beside the Motion Detection verdict, above the chart in Plan and 3D. Caption it “ภาพประกอบจำลอง”. The fixed slot keeps the chart in place when the figure fades out. Reduced motion shows a still figure.
+- Use the current motion verdict from live RSSI, Replay or simulated RSSI. Stop the animation and fade it out when motion ends, the live stream disconnects, or Replay completes. Keep “เล่นย้อนหลังจบแล้ว” visible after Replay.
+- Label the sensing panel and floor-plan motion with “ของจริง”, “ย้อนหลัง” or “จำลอง” as appropriate. WiFi Alerts and toasts keep the label from the time of detection, and simulated RSSI Alerts are marked as Simulated.
 
 ## Phase 3 — Calibration, diagnostics, blocking label
 

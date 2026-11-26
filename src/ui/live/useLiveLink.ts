@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { liveLinkOf, roomsCrossed, type Id, type LiveLink } from '../../core';
 import { useSceneStore } from '../store';
-import { useSensingStore } from '../sensing/sensingStore';
+import { selectMotion, selectSensingOrigin, useSensingStore } from '../sensing/sensingStore';
 
 /** The Site's placed Link in the current doc, or null (simulation, or devices not placed yet). */
 export function useLiveLink(): LiveLink | null {
@@ -21,12 +21,10 @@ export function useCrossedRoomIds(): Set<Id> {
 }
 
 /**
- * The single Live Mirror signal shared by the Link line and the room fills so they always agree:
- * `mirrored` = Observed evidence is flowing (live, fake, or replay); `motion` = the detector's
- * current verdict is motion.
+ * The Link and room fills share the same WiFi source and current Motion Detection verdict.
  */
 export function useLiveMirror(): { mirrored: boolean; motion: boolean } {
-  const mirrored = useSensingStore((s) => s.source === 'replay' || s.connection === 'live' || s.connection === 'fake');
-  const motion = useSensingStore((s) => s.verdict?.motion === true);
+  const mirrored = useSensingStore((s) => selectSensingOrigin(s) !== null);
+  const motion = useSensingStore(selectMotion);
   return { mirrored, motion };
 }

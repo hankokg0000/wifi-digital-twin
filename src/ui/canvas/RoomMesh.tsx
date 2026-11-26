@@ -5,7 +5,7 @@ import { Line } from '@react-three/drei';
 import type { Room } from '../../core';
 import { PALETTE } from '../theme/palette';
 import { prefersReducedMotion } from '../theme/motion';
-import { useMonitoredRoomId, useSensingStore } from '../sensing/sensingStore';
+import { useMonitoredRoomId } from '../sensing/sensingStore';
 import { useCrossedRoomIds, useLiveLink, useLiveMirror } from '../live/useLiveLink';
 import { useSceneStore } from '../store';
 import { getRoomStatus, type RoomStatus } from './roomStatus';
@@ -59,16 +59,13 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
   }, [room.polygon]);
 
   const isMonitored = useMonitoredRoomId() === room.id;
-  // Live Mirror: Observed evidence about this room (live or replayed), in the accent colour.
-  const mirrored = useSensingStore((s) => isMonitored && (s.source === 'replay' || s.connection === 'live' || s.connection === 'fake'));
-  const motion = useSensingStore((s) => isMonitored && s.verdict?.motion === true);
+  const { mirrored, motion } = useLiveMirror();
   // With a Live Link every room it crosses shows motion faintly (no pulse), replacing the
   // monitored-room fill; the monitored room keeps its outline.
   const hasLink = useLiveLink() !== null;
   const crossed = useCrossedRoomIds().has(room.id);
-  const mirror = useLiveMirror();
-  const crossedMotion = hasLink && crossed && mirror.mirrored && mirror.motion;
-  const showFill = hasLink ? crossedMotion : mirrored && motion;
+  const showsMotion = hasLink ? crossed : isMonitored;
+  const showFill = showsMotion && motion;
   const fillRef = useRef<THREE.Mesh>(null);
   const baseRef = useRef<THREE.Mesh>(null);
   const monitoring = useSceneStore((s) => s.mode) === 'monitor';
@@ -120,7 +117,7 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
 
   return (
     <>
-    {mirrored && outline.length >= 3 && <Line points={outline} color={PALETTE.accent} lineWidth={2.5} />}
+    {isMonitored && mirrored && outline.length >= 3 && <Line points={outline} color={PALETTE.accent} lineWidth={2.5} />}
     {showFill && (
       <mesh ref={fillRef} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <shapeGeometry args={[shape]} />

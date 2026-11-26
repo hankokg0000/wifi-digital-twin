@@ -21,7 +21,7 @@ import { SignalPanel } from './monitor/SignalPanel';
 import { HeatmapDriver } from './rf/useHeatmap';
 import { HeatmapLegend } from './rf/HeatmapLegend';
 import { ProbeTooltip } from './rf/ProbeTooltip';
-import { useSensingStore } from './sensing/sensingStore';
+import { selectActiveSensingAlertId, useSensingStore } from './sensing/sensingStore';
 import { SensingPanel } from './sensing/SensingPanel';
 import { SensingDriver } from './sensing/SensingDriver';
 import { LiveDriver } from './live/LiveDriver';
@@ -31,8 +31,8 @@ import './rf/rf.css';
 function MonitorRails() {
   const m = useMonitorModel();
   const real = useSceneStore((s) => s.reality === 'real');
-  const observedActive = useSensingStore((st) => (st.observedActiveId ? 1 : 0));
-  const attention = m.attention.length + observedActive;
+  const sensingActive = useSensingStore((s) => Number(selectActiveSensingAlertId(s) !== null));
+  const attention = m.attention.length + sensingActive;
   return (
     <>
       <Rail side="left" label="ในบ้านตอนนี้" icon={Users} badge={m.occupants.length}>
@@ -54,7 +54,7 @@ function MonitorRails() {
         <AlertToasts />
       </main>
       <Rail side="right" label="การแจ้งเตือน" icon={Bell} badge={attention} badgeTone={m.criticalCount > 0 ? 'critical' : 'warning'}>
-        <AlertsFeed forcedFilter={real ? 'observed' : undefined} />
+        <AlertsFeed sensingOnly={real} />
       </Rail>
       {!real && <Timeline />}
     </>

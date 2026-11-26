@@ -23,6 +23,14 @@ import {
 
 export type Connection = 'connecting' | 'live' | 'fake' | 'offline';
 export type SensingSource = 'live' | 'replay';
+export type SensingOrigin = 'live' | 'replay' | 'simulated';
+
+export const SENSING_ORIGIN_LABEL: Record<SensingOrigin, string> = {
+  live: 'ของจริง',
+  replay: 'ย้อนหลัง',
+  simulated: 'จำลอง',
+};
+
 export interface MotionEpisode {
   start: number;
   end?: number;
@@ -37,8 +45,8 @@ export interface WifiRecording {
   meta: { channel: number };
 }
 
-/** An Observed alert plus whether it came from a replayed Recording (never passed off as live). */
-export type ObservedAlert = Alert & { replay: boolean };
+/** An Alert from WiFi Motion Detection, with its origin captured when it was raised. */
+export type SensingAlert = Alert & { origin: SensingOrigin };
 
 export const BASELINE_SECONDS = 30;
 export const BUFFER_SECONDS = 120;
@@ -65,10 +73,29 @@ interface SensingState {
   replayProgress: number;
   /** Fake mode only: the dev server is currently simulating a person walking. */
   fakeMotion: boolean;
-  /** Observed alerts raised by WiFi Motion Detection, newest last. Wall-clock `t` (epoch s). */
-  observedAlerts: ObservedAlert[];
-  /** Id of the Observed alert belonging to the motion episode that is still going, if any. */
-  observedActiveId: string | null;
+  /** Alerts raised by WiFi Motion Detection, newest last. Wall-clock `t` (epoch s). */
+  sensingAlerts: SensingAlert[];
+  sensingActiveId: string | null;
+}
+
+export function selectSensingOrigin(s: SensingState): SensingOrigin | null {
+  if (s.source === 'replay') return 'replay';
+  if (s.connection === 'fake') return 'simulated';
+  return s.connection === 'live' ? 'live' : null;
+}
+
+export function selectCurrentVerdict(s: SensingState): Verdict | null {
+  if (selectSensingOrigin(s) === null || s.baselineProgress !== null) return null;
+  if (s.source === 'replay' && s.replayProgress >= 1) return null;
+  return s.verdict;
+}
+
+export function selectMotion(s: SensingState): boolean {
+  return selectCurrentVerdict(s)?.motion === true;
+}
+
+export function selectActiveSensingAlertId(s: SensingState): string | null {
+  return selectMotion(s) ? s.sensingActiveId : null;
 }
 
 function load<T>(key: string): T | null {
@@ -105,8 +132,8 @@ export const useSensingStore = create<SensingState>()(() => ({
   episodes: [],
   replayProgress: 0,
   fakeMotion: false,
-  observedAlerts: [],
-  observedActiveId: null,
+  sensingAlerts: [],
+  sensingActiveId: null,
 }));
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
@@ -157,7 +184,7 @@ function resetDetector(): void {
 function clearBuffers(): void {
   sensingBuffers.readings.length = 0;
   sensingBuffers.verdicts.length = 0;
-  set({ verdict: null, episodes: [], observedActiveId: null });
+  set({ verdict: null, episodes: [], sensingActiveId: null });
   resetDetector();
 }
 
@@ -176,14 +203,14 @@ function trim(): void {
   }
 }
 
-const MAX_OBSERVED = 50;
+const MAX_SENSING_ALERTS = 50;
 
 /**
  * Rising edge of motion: if the Monitored Room has an enabled Zone that applies to anything,
- * raise an Observed alert. Zones for only people or only pets are never triggered by WiFi,
+ * raise an Alert. Zones for only people or only pets are never triggered by WiFi,
  * which cannot tell them apart.
  */
-function observedAlertFor(source: SensingSource): ObservedAlert | null {
+function sensingAlertFor(origin: SensingOrigin): SensingAlert | null {
   const doc = useSceneStore.getState().doc;
   const room = resolveMonitoredRoom(doc, get().monitoredRoomId);
   if (!room) return null;
@@ -192,32 +219,39 @@ function observedAlertFor(source: SensingSource): ObservedAlert | null {
   const now = Date.now();
   const [cx, cz] = room.polygon.reduce<[number, number]>((a, p) => [a[0] + p[0] / room.polygon.length, a[1] + p[1] / room.polygon.length], [0, 0]);
   return {
-    id: `observed:${zone.id}:${now}`,
+    id: `wifi:${zone.id}:${now}`,
     t: now / 1000,
     kind: 'motion-in-zone',
-    source: 'observed',
+    source: origin === 'simulated' ? 'simulated' : 'observed',
     severity: 'warning',
     zoneId: zone.id,
     levelId: room.levelId,
     position: [cx, 0, cz],
     message: `ตรวจพบการเคลื่อนไหวใน${room.name} จาก WiFi`,
-    replay: source === 'replay',
+    origin,
   };
 }
 
 function applyVerdict(v: Verdict, source: SensingSource): void {
   sensingBuffers.verdicts.push(v);
-  const prev = get().verdict;
-  let episodes = get().episodes;
+  const state = get();
+  const prev = state.verdict;
+  let episodes = state.episodes;
+  let sensingActiveId = state.sensingActiveId;
+  let sensingAlerts = state.sensingAlerts;
   if (v.motion && !prev?.motion) {
     episodes = [...episodes, { start: v.t, source }].slice(-MAX_EPISODES);
-    const alert = observedAlertFor(source);
-    if (alert) set({ observedAlerts: [...get().observedAlerts, alert].slice(-MAX_OBSERVED), observedActiveId: alert.id });
+    const origin = selectSensingOrigin(state);
+    const alert = origin === null ? null : sensingAlertFor(origin);
+    if (alert) {
+      sensingAlerts = [...sensingAlerts, alert].slice(-MAX_SENSING_ALERTS);
+      sensingActiveId = alert.id;
+    }
   } else if (!v.motion && prev?.motion) {
     episodes = episodes.map((e, i) => (i === episodes.length - 1 && e.end === undefined ? { ...e, end: v.t } : e));
-    set({ observedActiveId: null });
+    sensingActiveId = null;
   }
-  set({ verdict: v, episodes });
+  set({ verdict: v, episodes, sensingAlerts, sensingActiveId });
 }
 
 /** One reading through the whole pipeline (live or replay). */
@@ -251,7 +285,7 @@ function finishBaseline(): void {
   }
   const baseline = computeBaseline(readings, DEFAULT_DETECTOR_CONFIG, new Date().toISOString());
   save(BASELINE_KEY, baseline);
-  set({ baseline, baselineProgress: null, verdict: null, episodes: [], observedActiveId: null });
+  set({ baseline, baselineProgress: null, verdict: null, episodes: [], sensingActiveId: null });
   sensingBuffers.verdicts.length = 0;
   resetDetector();
 }
@@ -319,7 +353,7 @@ export function startReplay(rec: WifiRecording): void {
   const baseline = rec.baseline ?? get().baseline;
   if (!baseline) return;
   const readings = [...rec.readings].sort((a, b) => a.t - b.t);
-  set({ source: 'replay', replayProgress: 0 });
+  set({ source: 'replay', replayProgress: 0, rssi: null });
   clearBuffers();
   detector = createDetector(baseline, DEFAULT_DETECTOR_CONFIG);
   const t0 = readings[0]!.t;
@@ -340,7 +374,7 @@ export function startReplay(rec: WifiRecording): void {
 
 export function backToLive(): void {
   stopReplayTimer();
-  set({ source: 'live', replayProgress: 0 });
+  set({ source: 'live', replayProgress: 0, rssi: null });
   clearBuffers();
 }
 
@@ -349,25 +383,35 @@ export function backToLive(): void {
 /** Extra named SSE events other stores want (assigned on module load; avoids import cycles). */
 export const sseHandlers: { sites?: (d: unknown) => void } = {};
 
+function setConnection(connection: Connection): void {
+  const state = get();
+  if (state.connection === connection) return;
+  if (state.source === 'live') {
+    resetDetector();
+    set({ connection, rssi: null, verdict: null, episodes: [], sensingActiveId: null });
+  } else {
+    set({ connection });
+  }
+}
+
 /**
  * Connects to the dev server's /api/rssi/stream. EventSource reconnects by itself; while it is
  * down the connection shows 'offline'. Returns a disposer. Mount once (see <SensingDriver/>).
  */
 export function connectSensing(): () => void {
   if (typeof EventSource === 'undefined') {
-    set({ connection: 'offline' });
+    setConnection('offline');
     return () => {};
   }
   const es = new EventSource('/api/rssi/stream');
-  const live = () => (streamMode === 'fake' ? 'fake' : 'live');
-
-  es.onopen = () => set({ connection: 'connecting' });
-  es.onerror = () => set({ connection: 'offline' });
+  es.onopen = () => setConnection('connecting');
+  es.onerror = () => setConnection('offline');
   es.addEventListener('status', (e) => {
     try {
       const { mode, fakeMotion } = JSON.parse((e as MessageEvent<string>).data) as { mode: 'live' | 'fake' | 'error'; fakeMotion?: boolean };
       streamMode = mode;
-      set({ connection: mode === 'error' ? 'offline' : mode, fakeMotion: Boolean(fakeMotion) });
+      setConnection(mode === 'error' ? 'offline' : mode);
+      set({ fakeMotion: Boolean(fakeMotion) });
     } catch {
       /* ignore malformed status */
     }
@@ -387,12 +431,12 @@ export function connectSensing(): () => void {
       return;
     }
     if (d.error) {
-      set({ connection: 'offline' });
+      setConnection('offline');
       return;
     }
-    if (typeof d.ts !== 'number' || typeof d.rssi !== 'number') return;
+    if (streamMode === 'error' || typeof d.ts !== 'number' || typeof d.rssi !== 'number') return;
     lastReadingWall = performance.now();
-    if (get().connection !== live()) set({ connection: live() });
+    setConnection(streamMode);
     const r: Reading = { t: d.ts / 1000, rssi: d.rssi };
     if (get().source === 'live') {
       ingest(r, 'live');
@@ -406,7 +450,7 @@ export function connectSensing(): () => void {
   // No readings for 3 s while "connected" (WiFi dropped, helper died): say so.
   const watchdog = setInterval(() => {
     const c = get().connection;
-    if ((c === 'live' || c === 'fake') && performance.now() - lastReadingWall > 3000) set({ connection: 'offline' });
+    if ((c === 'live' || c === 'fake') && performance.now() - lastReadingWall > 3000) setConnection('offline');
   }, 1000);
 
   return () => {

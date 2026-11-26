@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { Siren, TriangleAlert, ShieldCheck, Check } from 'lucide-react';
+import type { AlertSource } from '../../core';
 import { useSceneStore } from '../store';
 import { useMonitorModel } from '../sim/useMonitorModel';
 import { clockAt, relativeThai } from '../sim/format';
 import type { AlertItem } from '../sim/model';
 import { Segmented } from '../components/Segmented';
-import { useSensingStore, type ObservedAlert } from '../sensing/sensingStore';
+import { SENSING_ORIGIN_LABEL, selectActiveSensingAlertId, useSensingStore, type SensingAlert } from '../sensing/sensingStore';
 import { jumpToAlert, jumpToRoomLevel } from './actions';
 
-type SourceFilter = 'all' | 'simulated' | 'observed';
+type SourceFilter = 'all' | AlertSource;
 
-function SourceBadge({ source, replay }: { source: 'simulated' | 'observed'; replay?: boolean }) {
-  if (source === 'simulated') return <span className="src-badge src-badge-sim">จำลอง</span>;
-  return <span className="src-badge src-badge-obs">{replay ? 'ของจริง · ย้อนหลัง' : 'ของจริง'}</span>;
+function SourceBadge({ source, label }: { source: AlertSource; label: string }) {
+  return <span className={`src-badge src-badge-${source === 'simulated' ? 'sim' : 'obs'}`}>{label}</span>;
 }
 
 const realClock = (tSec: number) => new Date(tSec * 1000).toLocaleTimeString('th-TH', { hour12: false });
 
-function ObservedItem({ alert, roomName, active }: { alert: ObservedAlert; roomName: string; active: boolean }) {
+function SensingItem({ alert, roomName, active }: { alert: SensingAlert; roomName: string; active: boolean }) {
   return (
     <li className="feed-item">
       <button type="button" className="feed-main" onClick={() => jumpToRoomLevel(alert.levelId, alert.position[0], alert.position[2])}>
@@ -29,7 +29,7 @@ function ObservedItem({ alert, roomName, active }: { alert: ObservedAlert; roomN
           <span className="feed-meta">
             <span className="mono">{realClock(alert.t)}</span>
             <span>{roomName}</span>
-            <SourceBadge source="observed" replay={alert.replay} />
+            <SourceBadge source={alert.source} label={SENSING_ORIGIN_LABEL[alert.origin]} />
             {active && <span className="feed-live">กำลังเคลื่อนไหว</span>}
           </span>
         </span>
@@ -54,7 +54,7 @@ function Item({ item, simT, onAck }: { item: AlertItem; simT: number; onAck?: ()
             <span className="mono">{clockAt(alert.t)}</span>
             <span>{relativeThai(simT, alert.t)}</span>
             <span>{item.room}</span>
-            <SourceBadge source="simulated" />
+            <SourceBadge source="simulated" label="จำลอง" />
             {critical && !item.active && <span className="feed-resolved">ลุกขึ้นแล้ว</span>}
           </span>
         </span>
@@ -70,7 +70,7 @@ function Item({ item, simT, onAck }: { item: AlertItem; simT: number; onAck?: ()
 }
 
 /** Right rail "การแจ้งเตือน": unacknowledged first, then history. Acknowledging is UI state only. */
-export function AlertsFeed({ forcedFilter }: { forcedFilter?: SourceFilter } = {}) {
+export function AlertsFeed({ sensingOnly = false }: { sensingOnly?: boolean }) {
   const { attention, history } = useMonitorModel();
   const simT = useSceneStore((s) => s.sim.t);
   const acknowledge = useSceneStore((s) => s.acknowledge);
@@ -81,25 +81,23 @@ export function AlertsFeed({ forcedFilter }: { forcedFilter?: SourceFilter } = {
   }
 
   const doc = useSceneStore((s) => s.doc);
-  const observed = useSensingStore((s) => s.observedAlerts);
-  const activeId = useSensingStore((s) => s.observedActiveId);
-  const [pickedFilter, setFilter] = useState<SourceFilter>('all');
-  const filter = forcedFilter ?? pickedFilter;
-  const showSim = filter !== 'observed';
-  const showObs = filter !== 'simulated';
+  const sensingAlerts = useSensingStore((s) => s.sensingAlerts);
+  const activeId = useSensingStore(selectActiveSensingAlertId);
+  const [filter, setFilter] = useState<SourceFilter>('all');
+  const showSim = !sensingOnly && filter !== 'observed';
   const simAttention = showSim ? attention : [];
   const simHistory = showSim ? history : [];
-  const obsItems = showObs ? [...observed].reverse() : [];
-  const roomName = (a: ObservedAlert) => doc.rooms.find((r) => r.levelId === a.levelId && a.zoneId && doc.zones.find((z) => z.id === a.zoneId)?.roomId === r.id)?.name ?? '—';
-  const empty = simAttention.length === 0 && simHistory.length === 0 && obsItems.length === 0;
+  const wifiItems = sensingAlerts.filter((a) => sensingOnly || filter === 'all' || a.source === filter).reverse();
+  const roomName = (a: SensingAlert) => doc.rooms.find((r) => r.levelId === a.levelId && a.zoneId && doc.zones.find((z) => z.id === a.zoneId)?.roomId === r.id)?.name ?? '—';
+  const empty = simAttention.length === 0 && simHistory.length === 0 && wifiItems.length === 0;
 
   return (
     <div className="feed">
       <header className="feed-head">
         <h2 className="section-title">การแจ้งเตือน</h2>
-        <span className="mono feed-count">{simAttention.length + simHistory.length + obsItems.length}</span>
+        <span className="mono feed-count">{simAttention.length + simHistory.length + wifiItems.length}</span>
       </header>
-      {!forcedFilter && <div className="feed-filter">
+      {!sensingOnly && <div className="feed-filter">
         <Segmented
           fill
           label="กรองตามแหล่งที่มา"
@@ -115,18 +113,18 @@ export function AlertsFeed({ forcedFilter }: { forcedFilter?: SourceFilter } = {
       {empty ? (
         <div className="feed-empty">
           <ShieldCheck size={32} strokeWidth={1.5} />
-          <p>{filter === 'observed' ? 'ยังไม่พบการเคลื่อนไหวจาก WiFi' : 'ยังไม่มีเหตุการณ์ — กด ▶ เพื่อเริ่มจำลอง'}</p>
+          <p>{sensingOnly || filter === 'observed' ? 'ยังไม่พบการเคลื่อนไหวจาก WiFi' : 'ยังไม่มีเหตุการณ์ — กด ▶ เพื่อเริ่มจำลอง'}</p>
         </div>
       ) : (
         <div className="feed-scroll">
-          {obsItems.length > 0 && (
+          {wifiItems.length > 0 && (
             <>
               <h3 className="feed-group">
-                ของจริงจาก WiFi <span className="mono">{obsItems.length}</span>
+                การตรวจจับ WiFi <span className="mono">{wifiItems.length}</span>
               </h3>
               <ul className="feed-list">
-                {obsItems.map((a) => (
-                  <ObservedItem key={a.id} alert={a} roomName={roomName(a)} active={a.id === activeId} />
+                {wifiItems.map((a) => (
+                  <SensingItem key={a.id} alert={a} roomName={roomName(a)} active={a.id === activeId} />
                 ))}
               </ul>
             </>

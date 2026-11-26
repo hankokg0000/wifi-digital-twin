@@ -2,7 +2,7 @@ import { Siren, TriangleAlert, Check, Play, Undo2, Redo2, Eye, Pencil } from 'lu
 import { useSceneStore } from '../store';
 import { useMonitorModel } from '../sim/useMonitorModel';
 import { startDemo } from '../demo';
-import { useSensingStore } from '../sensing/sensingStore';
+import { selectActiveSensingAlertId, useSensingStore } from '../sensing/sensingStore';
 import { useLiveStore, setWantReal } from '../live/liveStore';
 import { activeSite } from '../../core';
 import { Segmented } from '../components/Segmented';
@@ -14,10 +14,9 @@ import './topbar.css';
 
 function StatusPills() {
   const m = useMonitorModel();
-  // A WiFi motion episode that has raised an Observed alert and is still going counts as one warning.
-  const observedActive = useSensingStore((s) => (s.observedActiveId ? 1 : 0));
+  const sensingActive = useSensingStore((s) => Number(selectActiveSensingAlertId(s) !== null));
   const criticalCount = m.criticalCount;
-  const warningCount = m.warningCount + observedActive;
+  const warningCount = m.warningCount + sensingActive;
   const allClear = criticalCount === 0 && warningCount === 0;
   return (
     <div className="pills" role="status" aria-live="polite">
