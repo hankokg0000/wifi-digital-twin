@@ -56,12 +56,15 @@
   animation: sensing-blink 1s ease-in-out infinite;
 }
 
-.sensing-status {
-  display: flex;
+.sensing-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
-  min-height: 34px;
-  font-size: var(--fs-5);
+}
+
+.sensing-status {
+  font-size: var(--fs-4);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -79,13 +82,109 @@
   color: var(--accent);
 }
 
-.sensing-pulse {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: sensing-pulse 1.4s ease-in-out infinite;
+.motion-preview {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--sp-1);
+  min-height: 68px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg);
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-2) var(--ease), visibility 0s linear var(--dur-2);
+}
+
+.motion-preview[data-active='true'] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.motion-figure {
+  position: relative;
+  width: 30px;
+  height: 35px;
+  color: var(--accent);
+}
+
+.motion-figure > i {
+  position: absolute;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.motion-head {
+  top: 0;
+  left: 13px;
+  width: 8px;
+  height: 8px;
+}
+
+.motion-torso {
+  top: 9px;
+  left: 12px;
+  width: 7px;
+  height: 13px;
+  transform: rotate(10deg);
+}
+
+.motion-limb {
+  left: 12px;
+  width: 4px;
+  transform-origin: 50% 2px;
+  animation: motion-stride 900ms ease-in-out infinite alternate paused;
+}
+
+.motion-arm {
+  top: 10px;
+  height: 11px;
+  animation-direction: alternate-reverse;
+}
+
+.motion-leg {
+  top: 19px;
+  height: 14px;
+}
+
+.motion-limb::after {
+  position: absolute;
+  top: calc(100% - 3px);
+  left: 0;
+  width: inherit;
+  height: 5px;
+  border-radius: inherit;
+  background: currentColor;
+  transform: rotate(-35deg);
+  transform-origin: top center;
+  content: '';
+}
+
+.motion-leg::after {
+  transform: rotate(50deg);
+}
+
+.motion-far {
+  color: color-mix(in oklch, var(--accent) 68%, var(--bg));
+  animation-delay: -900ms;
+}
+
+.motion-preview[data-active='true'] .motion-limb {
+  animation-play-state: running;
+}
+
+@keyframes motion-stride {
+  from {
+    transform: rotate(-30deg);
+  }
+  to {
+    transform: rotate(30deg);
+  }
 }
 
 .sensing-chart {
@@ -145,21 +244,15 @@
   color: var(--ink-3);
 }
 
+.sensing-hint {
+  color: var(--ink-2);
+  font-size: var(--fs-1);
+  margin: 0;
+}
+
 .sensing-error {
   color: var(--ink-2);
   font-size: var(--fs-1);
-}
-
-@keyframes sensing-pulse {
-  0%,
-  100% {
-    transform: scale(0.8);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
 }
 
 @keyframes sensing-blink {
@@ -169,8 +262,24 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sensing-pulse,
+  .motion-limb,
   .sensing-dot.connecting {
     animation: none;
+  }
+
+  .motion-preview {
+    transition: none;
+  }
+
+  .motion-arm {
+    transform: rotate(-8deg);
+  }
+
+  .motion-leg {
+    transform: rotate(8deg);
+  }
+
+  .motion-far {
+    transform: rotate(-14deg);
   }
 }

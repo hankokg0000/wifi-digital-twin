@@ -5,7 +5,8 @@ import { Line } from '@react-three/drei';
 import type { Room } from '../../core';
 import { PALETTE } from '../theme/palette';
 import { prefersReducedMotion } from '../theme/motion';
-import { useMonitoredRoomId, useSensingStore } from '../sensing/sensingStore';
+import { useMonitoredRoomId } from '../sensing/sensingStore';
+import { useCrossedRoomIds, useLiveLink, useLiveMirror } from '../live/useLiveLink';
 import { useSceneStore } from '../store';
 import { getRoomStatus, type RoomStatus } from './roomStatus';
 
@@ -58,9 +59,13 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
   }, [room.polygon]);
 
   const isMonitored = useMonitoredRoomId() === room.id;
-  // Live Mirror: Observed evidence about this room (live or replayed), in the accent colour.
-  const mirrored = useSensingStore((s) => isMonitored && (s.source === 'replay' || s.connection === 'live' || s.connection === 'fake'));
-  const motion = useSensingStore((s) => isMonitored && s.verdict?.motion === true);
+  const { mirrored, motion } = useLiveMirror();
+  // With a Live Link every room it crosses shows motion faintly (no pulse), replacing the
+  // monitored-room fill; the monitored room keeps its outline.
+  const hasLink = useLiveLink() !== null;
+  const crossed = useCrossedRoomIds().has(room.id);
+  const showsMotion = hasLink ? crossed : isMonitored;
+  const showFill = showsMotion && motion;
   const fillRef = useRef<THREE.Mesh>(null);
   const baseRef = useRef<THREE.Mesh>(null);
   const monitoring = useSceneStore((s) => s.mode) === 'monitor';
@@ -85,7 +90,7 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
 
   useFrame(({ clock }, delta) => {
     const mat = fillRef.current?.material as THREE.MeshBasicMaterial | undefined;
-    if (mat) mat.opacity = reduced ? 0.3 : 0.26 + 0.1 * Math.sin(clock.elapsedTime * 3);
+    if (mat) mat.opacity = hasLink ? 0.12 : reduced ? 0.3 : 0.26 + 0.1 * Math.sin(clock.elapsedTime * 3);
 
     const base = baseRef.current?.material as THREE.MeshBasicMaterial | undefined;
     if (!base) return;
@@ -112,8 +117,8 @@ export function RoomMesh({ room, selected, interactive, opacity, onSelect }: Roo
 
   return (
     <>
-    {mirrored && outline.length >= 3 && <Line points={outline} color={PALETTE.accent} lineWidth={2.5} />}
-    {mirrored && motion && (
+    {isMonitored && mirrored && outline.length >= 3 && <Line points={outline} color={PALETTE.accent} lineWidth={2.5} />}
+    {showFill && (
       <mesh ref={fillRef} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <shapeGeometry args={[shape]} />
         <meshBasicMaterial color={PALETTE.accent} transparent opacity={0.3} side={THREE.DoubleSide} depthWrite={false} />

@@ -7,6 +7,8 @@ import { INDOOR_RSSI_STREAM } from '../src/core/sensing/live-rssi';
 import { localOperator } from './camera-clips';
 import { INDOOR_RSSI_SHARE_PATH } from '../src/core/sensing/public-wifi';
 import { createIndoorRssiPublication } from './indoor-rssi-public';
+import { createSitesStore, isLocalWrite } from './sites';
+import type { SitesFile } from '../src/core/live/sites';
 
 /**
  * Streams this Mac's WiFi RSSI using the CoreWLAN helper. The Indoor Twin endpoint is local-only.
@@ -52,7 +54,8 @@ export function rssiPlugin(): Plugin {
   function configure(server: ViteDevServer | PreviewServer, legacy: boolean) {
     const root = server.config.root;
     const publication = createIndoorRssiPublication(root, server.config.logger);
-    const clients = new Set<ServerResponse>();
+    const sites = legacy ? createSitesStore(root) : undefined;
+    const clients = new Map<ServerResponse, boolean>();
     let helper: ChildProcess | null = null;
     let ping: ChildProcess | null = null;
     let fakeTimer: ReturnType<typeof setInterval> | null = null;
@@ -62,9 +65,10 @@ export function rssiPlugin(): Plugin {
     let fakeMotion = false;
 
     const send = (chunk: string) => {
-      for (const c of clients) c.write(chunk);
+      for (const c of clients.keys()) c.write(chunk);
     };
     const statusChunk = () => `event: status\ndata: ${JSON.stringify({ mode, fakeMotion, ...(message ? { message } : {}) })}\n\n`;
+    const sitesChunk = (value: SitesFile) => `event: sites\ndata: ${JSON.stringify(value)}\n\n`;
     const setStatus = (m: Mode, msg?: string) => {
       mode = m;
       message = msg;
@@ -143,7 +147,7 @@ export function rssiPlugin(): Plugin {
       }, IDLE_MS);
     };
 
-    function stream(req: IncomingMessage, res: ServerResponse) {
+    function stream(req: IncomingMessage, res: ServerResponse, includeSites: boolean) {
       if (req.method !== 'GET') {
         res.statusCode = 405;
         res.end();
@@ -157,8 +161,9 @@ export function rssiPlugin(): Plugin {
       });
       if (idleTimer) clearTimeout(idleTimer);
       start(); // before adding this client: it gets the status line below instead
-      clients.add(res);
+      clients.set(res, includeSites);
       res.write(statusChunk());
+      if (includeSites && sites) res.write(sitesChunk(sites.get()));
       req.on('close', () => {
         clients.delete(res);
         if (clients.size === 0) scheduleIdleStop();
@@ -170,10 +175,10 @@ export function rssiPlugin(): Plugin {
         res.writeHead(403).end();
         return;
       }
-      stream(req, res);
+      stream(req, res, false);
     });
     if (publication) server.middlewares.use(INDOOR_RSSI_SHARE_PATH, (req, res) => void publication.configure(req, res));
-    if (legacy) server.middlewares.use('/api/rssi/stream', stream);
+    if (legacy) server.middlewares.use('/api/rssi/stream', (req, res) => stream(req, res, true));
     if (legacy) server.middlewares.use('/api/rssi/fake-motion', (req, res) => {
       if (req.method !== 'POST') {
         res.statusCode = 405;
@@ -194,6 +199,57 @@ export function rssiPlugin(): Plugin {
         }
       });
     });
+
+    if (sites) {
+      const MAX_SITES_BODY = 256 * 1024;
+      server.middlewares.use('/api/sites', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method === 'GET') {
+          res.end(JSON.stringify(sites.get()));
+          return;
+        }
+        if (req.method !== 'PUT') {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+        if (!isLocalWrite(req.headers)) {
+          res.statusCode = 403;
+          res.end();
+          return;
+        }
+        let body = '';
+        let size = 0;
+        let tooBig = false;
+        req.on('data', (d: Buffer) => {
+          size += d.length;
+          if (size > MAX_SITES_BODY) tooBig = true;
+          else body += d;
+        });
+        req.on('end', () => {
+          if (tooBig) {
+            res.statusCode = 413;
+            res.end();
+            return;
+          }
+          let saved: ReturnType<typeof sites.put> = null;
+          try {
+            saved = sites.put(JSON.parse(body));
+          } catch {
+            saved = null;
+          }
+          if (!saved) {
+            res.statusCode = 400;
+            res.end();
+            return;
+          }
+          res.end(JSON.stringify(saved));
+          for (const [client, includeSites] of clients) {
+            if (includeSites) client.write(sitesChunk(saved));
+          }
+        });
+      });
+    }
 
     const publisherTimer = publication ? setInterval(() => {
       start();

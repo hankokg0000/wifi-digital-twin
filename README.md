@@ -23,7 +23,16 @@ pnpm install
 pnpm dev
 ```
 
-เปิด http://localhost:5173 แล้วกด **เริ่มเดโม** มุมขวาบน
+คำสั่งเดียวเปิดทุกหน้าจากโปรเจกต์นี้
+
+| หน้า | เปิดที่ |
+|---|---|
+| WiFi Digital Twin พร้อม Live Link | [หน้าหลัก](http://localhost:5173/) · กด **เริ่มเดโม** หรือสลับเป็น **ของจริง** เพื่อเลือกสถานที่และวางตำแหน่งอุปกรณ์ |
+| Indoor Twin | [อาคารและผังชั้น 14](http://localhost:5173/indoor-twin/) |
+| Camera Twin | [วิดีโอและผัง 3D](http://localhost:5173/camera-twin/) |
+| นำเข้าแปลนห้อง | [Room Scan](http://localhost:5173/camera-twin/scan/) |
+
+การอ่าน RSSI จริงใช้ Mac ที่เชื่อมกับ WiFi ตั้ง `RSSI_FAKE=1` ก่อนรัน `pnpm dev` เพื่อทดสอบด้วยสัญญาณจำลองในหน้า WiFi Digital Twin
 
 | คำสั่ง | ทำอะไร |
 |---|---|
@@ -66,7 +75,7 @@ pnpm dev
 
 ### เปิดเดโมออฟฟิศ
 
-เตรียมคลิปครั้งเดียวบน Mac ที่มี FFmpeg และ Swift CLI tools แล้วจึงบิลด์
+ถ้ามีไฟล์ `public/camera-twin/office-demo/replay.json` แล้ว เปิดเดโมออฟฟิศได้เลย ถ้ายังไม่มี ให้เตรียมคลิปบน Mac ที่มี FFmpeg และ Swift CLI tools แล้วจึงบิลด์
 
 ```bash
 pnpm camera:prepare-demo "/path/to/office.mp4"

@@ -2,7 +2,7 @@ import { useCallback, type ReactNode } from 'react';
 import { CameraOff, Wifi } from 'lucide-react';
 import { useSceneStore } from './store';
 import { registerLabel, unregisterLabel } from './canvas/labels';
-import { useMonitoredRoomId, useSensingStore } from './sensing/sensingStore';
+import { SENSING_ORIGIN_LABEL, selectMotion, selectSensingOrigin, useMonitoredRoomId, useSensingStore } from './sensing/sensingStore';
 import { useHeatmapStore } from './rf/heatmapStore';
 import { QUALITY_COLOR, QUALITY_ICON, fmtDbm } from './rf/quality';
 import type { Id, Vec2 } from '../core';
@@ -38,10 +38,9 @@ function RoomSignal({ roomId, levelId }: { roomId: Id; levelId: Id }) {
 /** Live Mirror label under the Monitored Room's name while Motion Detection says motion. */
 function RoomMirror({ roomId }: { roomId: Id }) {
   const monitored = useMonitoredRoomId() === roomId;
-  const motion = useSensingStore((s) => monitored && s.verdict?.motion === true);
-  const replay = useSensingStore((s) => s.source === 'replay');
-  if (!motion) return null;
-  return <span className="room-mirror">{replay ? 'ของจริง · ย้อนหลัง · มีการเคลื่อนไหว' : 'ของจริง · มีการเคลื่อนไหว'}</span>;
+  const origin = useSensingStore((s) => monitored && selectMotion(s) ? selectSensingOrigin(s) : null);
+  if (origin === null) return null;
+  return <span className="room-mirror">{SENSING_ORIGIN_LABEL[origin]} · มีการเคลื่อนไหว</span>;
 }
 
 interface LabelDivProps {

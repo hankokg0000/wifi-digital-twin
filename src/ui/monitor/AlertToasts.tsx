@@ -3,11 +3,11 @@ import { TriangleAlert, X } from 'lucide-react';
 import type { Alert } from '../../core';
 import { useSceneStore } from '../store';
 import { useAlerts } from '../useAlerts';
-import { useSensingStore } from '../sensing/sensingStore';
+import { SENSING_ORIGIN_LABEL, useSensingStore, type SensingAlert } from '../sensing/sensingStore';
 
 interface ToastItem {
   id: string;
-  alert: Alert;
+  alert: Alert | SensingAlert;
 }
 
 const COALESCE_WINDOW_MS = 1000;
@@ -50,19 +50,17 @@ export function AlertToasts() {
     }
   }, [simT, playing, alerts]);
 
-  // Observed alerts toast the moment they are raised (they have no sim time to cross).
-  const observedCount = useSensingStore((s) => s.observedAlerts.length);
-  const seenObservedRef = useRef(observedCount);
+  // WiFi alerts toast when raised. Read the last item so this still works when history is full.
+  const latestSensingAlert = useSensingStore((s) => s.sensingAlerts.at(-1));
+  const seenSensingRef = useRef(latestSensingAlert?.id);
   useEffect(() => {
-    const seen = seenObservedRef.current;
-    seenObservedRef.current = observedCount;
-    if (observedCount <= seen) return;
-    const alert = useSensingStore.getState().observedAlerts[observedCount - 1];
-    if (!alert) return;
+    const alert = latestSensingAlert;
+    if (!alert || alert.id === seenSensingRef.current) return;
+    seenSensingRef.current = alert.id;
     const id = `${alert.id}:toast`;
     setToasts((prev) => [...prev, { id, alert }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), AUTO_DISMISS_MS + 2000);
-  }, [observedCount]);
+  }, [latestSensingAlert]);
 
   useEffect(() => {
     if (coalescedCount === 0) return;
@@ -77,7 +75,7 @@ export function AlertToasts() {
       {toasts.map(({ id, alert }) => (
         <div key={id} className="warn-toast">
           <TriangleAlert size={16} strokeWidth={1.5} />
-          <span>{alert.message}</span>
+          <span>{'origin' in alert ? `${SENSING_ORIGIN_LABEL[alert.origin]} · ` : ''}{alert.message}</span>
           <button className="icon-btn" aria-label="ปิด" onClick={() => setToasts((p) => p.filter((t) => t.id !== id))}>
             <X size={14} strokeWidth={1.5} />
           </button>

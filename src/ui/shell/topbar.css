@@ -127,3 +127,9 @@
     padding: 0 var(--sp-2);
   }
 }
+
+.topbar-center {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}

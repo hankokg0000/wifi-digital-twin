@@ -1,6 +1,6 @@
 # Handoff — WiFi Digital Twin
 
-อัปเดต: 2026-11-12 · สำหรับคนที่จะมารับงานต่อ อ่านไฟล์นี้ก่อน แล้วค่อยไป [CONTEXT.md](../CONTEXT.md) (ศัพท์) และ [design.md](design.md) (ออกแบบละเอียด)
+อัปเดต: 2026-11-19 · สำหรับคนที่จะมารับงานต่อ อ่านไฟล์นี้ก่อน แล้วค่อยไป [CONTEXT.md](../CONTEXT.md) (ศัพท์) และ [design.md](design.md) (ออกแบบละเอียด)
 
 > ถ้าจะสร้างใหม่ทั้งหมดจากเอกสารโดยไม่ใช้โค้ดนี้ ใช้ [SPEC.md](SPEC.md) + [CONTEXT.md](../CONTEXT.md) (มีคำสั่งสำหรับ AI agent อยู่บนหัวไฟล์)
 
@@ -23,38 +23,38 @@
 
 ## 2. สถานะปัจจุบัน
 
-| Phase | สถานะ | Commit |
+| งาน | สถานะ | Commit |
 |---|---|---|
-| 0 — Scene editor (ผนัง, ประตู/หน้าต่าง, ห้อง, ของ, router, หลายชั้น, บันไดบ้าน, save/load JSON) | ✅ เสร็จ | `cea5189` |
-| Simulator คน/สัตว์ + Zone ห้ามเข้า + Alert (บุกรุก, ล้ม) | ✅ เสร็จ | `9b112de` |
-| Refactor (แยก ops/serialize/parse, store slices) | ✅ เสร็จ | `b145375` |
-| UI dark ops console, โหมด Monitor/Edit | ✅ เสร็จ | `0869107` |
-| 1 — Propagation multi-wall + heatmap WiFi live | ✅ เสร็จ | `3082505` |
-| **Pilot: Motion Detection ผ่านผนัง** | 🟡 ออกแบบ/ตกลงศัพท์เสร็จ ยังไม่เริ่มเขียนโค้ด | — |
+| Scene editor, simulator, Zone/Alert, UI ops console, propagation + heatmap | ✅ | ถึง `08eab89` |
+| **Pilot: Motion Detection ผ่านผนัง (ของจริง)** — Mac อ่าน RSSI จาก hotspot, Baseline, Recording/Replay, Live Mirror, Alert "ของจริง" + filter, `docs/DEMO.md` | ✅ | `e35290a` |
+| ปรับภาพ Monitor (ตัดผนังเตี้ย, ซ่อนชั้นบน, ป้ายไม่ทับกัน, สีห้องตามสถานะ, ชื่อภาษาอังกฤษ) | ✅ | `e35290a` |
+| **Live Link เฟส 1** — สถานที่ (Site), ห้องด่วน (Quick Room), สวิตช์ ของจริง/จำลอง | ✅ ทดสอบใน browser แล้ว | `694f7f0` |
+| **Live Link เฟส 2** — วางอุปกรณ์บนผัง, เส้น Live Link + แถบ Coverage, ห้องที่เฝ้าอัตโนมัติ | 🟡 **เขียนโค้ดแล้ว ยังไม่ commit ยังไม่ได้ลองใน browser ยังไม่มี test** | — |
+| **Live Link เฟส 3** — ปรับเทียบ, Signal Health, ป้ายการบัง | ⬜ ยังไม่เริ่ม | — |
 
-**Test ล่าสุดผ่านหมด:** vitest 180, Playwright E2E 29, build
-
-**ยังไม่ commit:** `CONTEXT.md` และไฟล์นี้
+- **Branch:** `main` ← `dev` ← `feature/live-link` (ทำงานอยู่บน `feature/live-link`) ทำครบ 3 เฟสแล้ว merge เข้า `dev` แล้วค่อยเข้า `main`
+- **Test:** vitest 308 ผ่าน (เฟส 1) · Playwright E2E ยังไม่ได้รันใหม่ตั้งแต่งาน sensing (ต้องรันบน port อื่น ดู §7)
+- **Deploy:**
+  - Vercel: https://wifi-digital-twin.vercel.app — ได้แค่ simulation เพราะตัวอ่าน RSSI ทำงานเฉพาะใน dev server (`.vercel/` ถูก ignore)
+  - เดโมของจริงให้คนอื่นดู: รัน `pnpm dev` บน Mac + `ngrok http 5173` (โดเมน ngrok อนุญาตไว้ใน `vite.config.ts`) สัญญาณมาจาก Mac เครื่องนั้นเครื่องเดียว คนเปิดลิงก์แค่ดู และต้องอัด Baseline ใน browser ตัวเอง
+- **ข้อมูลทดสอบค้าง:** `.wdt-data/sites.json` มีสถานที่ "ห้องทดสอบ" (4×5 m) ที่สร้างตอนทดสอบ ลบได้ (ไฟล์นี้ถูก ignore)
 
 ---
 
 ## 3. รันโปรเจกต์
 
-ต้องใช้ Node 24 และ pnpm
+ต้องใช้ Node 24, pnpm และ macOS (Xcode command line tools: `swiftc`) ถ้าจะอ่าน RSSI จริง เครื่องอื่นจะได้ค่าจำลอง
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173
-pnpm test         # vitest (core + store)
-pnpm e2e          # Playwright; ใช้ dev server ที่ 5173 ถ้ามีอยู่แล้ว
+pnpm dev          # http://localhost:5173 (เจ้าของมักเปิดค้างไว้ อย่าปิด/ฆ่า)
+pnpm test         # vitest
+pnpm e2e          # Playwright
 pnpm build        # tsc -b && vite build
 ```
 
-แอปเปิดมาที่โหมด **Monitor** โดยมีบ้านตัวอย่าง 2 ชั้นโหลดไว้แล้ว:
-
-- กดปุ่มเพื่อสุ่มคน/สัตว์ แล้วกด play ให้ sim เดิน
-- ดู heatmap และ Alert
-- สลับไปโหมด **Edit** เพื่อแก้ผัง
+- **โหมดจำลอง:** บ้านตัวอย่าง 2 ชั้น กด "เริ่มเดโม" ให้คน/สัตว์เดิน ดู heatmap และ Alert
+- **โหมดของจริง** (ปุ่ม ของจริง/จำลอง ซ้ายบน): เลือกสถานที่หรือ "ห้องใหม่" → อัด Baseline ตอนห้องนิ่ง → เดินผ่านแนว hotspot↔Mac → ขึ้น "มีการเคลื่อนไหว" + Alert ของจริง (บทเดโมเต็มใน `docs/DEMO.md`)
 
 ---
 
@@ -62,108 +62,75 @@ pnpm build        # tsc -b && vite build
 
 ```
 src/core/            pure TypeScript (ไม่มี React/three) — test ใน Node ได้
-  scene/             SceneDoc: types, validate, ops (immutable), serialize/parse (deterministic), sample-house
-  sim/               navgrid 0.2 m, A*, บันได, populate() สุ่มคน/สัตว์, roam/wander, การล้ม, หลบ Zone
-  alerts/            computeAlerts() — มี seam `stateAt` ไว้สลับจาก ground truth เป็นค่าที่ประมาณได้
-  rf/                multi-wall model: FSPL(1m) + 10·n·log10(d) + loss ต่อการทะลุ wall/opening/object/คน/พื้น, heatmap, roomCoverage
+  scene/             SceneDoc: types, validate, ops (immutable), serialize/parse, sample-house
+  sim/               navgrid, A*, populate() สุ่มคน/สัตว์ (ชื่ออังกฤษ), การล้ม, หลบ Zone
+  alerts/            computeAlerts() + observedAlertFor() (Alert ของจริง)
+  rf/                multi-wall model, traceLink/traceWorld, heatmap, roomCoverage
+  sensing/           Motion Detection: Baseline, detector (hysteresis), Recording
+  live/              sites.ts (ไม่มี import — plugin ใช้ด้วย), quickRoom.ts, linkGeometry.ts (เฟส 2)
 src/ui/
-  store/             zustand slices (doc, view, mode, alerts, heatmap); apply(fn, {coalesce}) = undo ได้
-  canvas/            R3F scene: walls, rooms, agents, HeatmapLayer (DataTexture), CameraRig
-  monitor/           แผงโหมด Monitor: SimControls, AlertsFeed, Occupants, Zones, Signal, Timeline
-  edit/ inspector/ tools/ panels/   โหมด Edit
-  rf/                colormap (indigo→mint, −90…−30 dBm), legend
-  theme/             OKLCH tokens (สีแดง/เหลืองอำพันสงวนไว้สำหรับ Alert เท่านั้น)
-e2e/                 Playwright specs (*.e2e.ts) + helpers.ts
-docs/design.md       ออกแบบละเอียด Phase 0–1, data model, propagation, roadmap
-CONTEXT.md           ศัพท์โดเมน (glossary) — ใช้คำตามนี้ในโค้ดและ UI
+  store/             zustand slices; docSlice มี reality 'sim'|'real' + simStash (โหมดของจริงไม่ autosave ทับผังจริงใน localStorage)
+  sensing/           sensingStore (EventSource /api/rssi/stream, Baseline ใน localStorage), SensingPanel, SensingChart
+  live/              liveStore (Sites จาก server, การวางอุปกรณ์), LiveDriver, LiveSetup, useLiveLink
+  canvas/            R3F: walls, rooms (RoomMesh = Live Mirror), agents, LiveLinkLayer, labels (priority + collision)
+  monitor/ edit/ inspector/ tools/ panels/ shell/ rf/ theme/
+vite-plugins/
+  rssi.ts            dev-only: compile + spawn helper Swift, SSE /api/rssi/stream (status/sites/readings), /api/sites
+  sites.ts           isLocalWrite (กัน ngrok เขียน), createSitesStore (.wdt-data/sites.json)
+helper/mac-rssi/     rssi.swift (CoreWLAN) → JSON {ts,rssi,noise,channel} ต่อบรรทัด 10 Hz
+docs/                HANDOFF (ไฟล์นี้), DEMO (บทเดโม), plans/live-link.md (แผนงานปัจจุบัน), design.md, SPEC.md
 ```
 
-**Stack:**
+---
 
-- Vite 8, React 19, TypeScript strict
-- @react-three/fiber 9.8 + drei 10, zustand 5
-- comlink (worker), lucide-react, ฟอนต์ IBM Plex Sans Thai/Mono
-- vitest, Playwright
+## 5. งานที่กำลังทำ: Live Link
+
+**แผนละเอียด (ไฟล์ ฟังก์ชัน signature เกณฑ์ test): [plans/live-link.md](plans/live-link.md)** ตกลงกับเจ้าของแล้วทุกข้อ ห้ามเปลี่ยนโดยไม่ถาม
+
+### 5.1 สิ่งที่ตกลงกัน (สรุป)
+1. วางอุปกรณ์จากแผง "ตรวจจับ WiFi" ในโหมด Monitor: คลิกจุด hotspot แล้วคลิกจุด Mac (วางนอกห้องได้)
+2. ตอนจับได้: เส้น + แถบ Coverage เรืองเด่น ห้องที่เส้นผ่านเรืองจาง
+3. ห้องที่เฝ้า = ห้องที่เส้นผ่านยาวสุด อัตโนมัติ แก้เองได้
+4. ปรับเทียบตอนอัด Baseline (ค่าชดเชย = วัดจริง − twin ทำนาย) แล้วโชว์ "twin ทำนายคนขวางลด X dB / วัดได้ Y dB"
+5. ตำแหน่งอุปกรณ์/สถานที่เก็บที่ dev server แชร์ทุกคน แก้ได้จาก localhost เท่านั้น · Baseline แยกต่อ browser
+6. ห้องด่วน กว้าง×ยาว + บันทึกเป็นชื่อสถานที่ สลับได้ (ห้องกว้างเห็นแถบ Coverage ว่าคลุมแค่ไหน)
+7. สวิตช์ ของจริง/จำลอง
+8. ผนังใช้ค่าเริ่มต้น (drywall) ไม่ให้เลือก
+9. Signal Health: การ์ดแถวเดียวใต้กราฟ (ไฟ · dBm · คุณภาพ · SNR) กดขยายเป็นเช็กลิสต์ · ป้ายการบังกลางเส้นบนผัง
+10. เช็กเครือข่าย: จำ gateway + channel ตอนตั้งค่า เปลี่ยนแล้วขึ้นแดง
+11. ระยะ: ก่อนปรับเทียบ "จาก RSSI ≈ X m / บนผัง Y m" · หลังปรับเทียบเตือน "อุปกรณ์อาจถูกย้าย" ถ้าเลื่อน > 6 dB
+12. ป้ายการบัง: "−6 dB · บังระดับกลาง" + ขีดอ้างอิง "คน 1 คนขวาง ≈ −X dB (twin)" **ห้ามนับจำนวนคน**
+13. เกณฑ์ไฟ: แดง = ไม่มีค่าใหม่ > 2 วิ / เปลี่ยนเครือข่าย / RSSI < −85 · เหลือง = ไม่มี Baseline / < 5 Hz / −75…−85 / แกว่ง > 2 dB ตอนนิ่ง / อุปกรณ์อาจถูกย้าย / ระยะต่าง > 2 เท่า · เขียว = "พร้อมเดโม"
+
+### 5.2 ทำต่อจากตรงนี้ (เรียงลำดับ)
+1. **ตรวจเฟส 2 ใน browser** (โหมดของจริง, มีสถานที่):
+   - กด "วางตำแหน่งอุปกรณ์" → คลิก 2 จุดได้ทั้ง Plan และ 3D, คลิกขวา/Esc ยกเลิก, ไม่ไปเลือก object อื่น, กล้องยังหมุน/ซูมได้ตอนไม่ได้วาง
+   - เส้นกับแถบขึ้นถูกที่, ตอน "มีการเคลื่อนไหว" เส้นและห้องที่เส้นผ่านเรือง, ตอน offline เส้นเป็นเส้นประเทา
+   - dropdown ห้องที่เฝ้ามีตัวเลือก "อัตโนมัติ" · ตำแหน่งยังอยู่หลัง reload · เปิดผ่าน ngrok เห็นเส้นเดียวกันแต่ปุ่มกดไม่ได้
+   - วางอุปกรณ์นอกห้องแล้วกล้องยังเห็นครบ (bounds รวม radio แล้ว)
+2. **เขียน test `src/core/live/linkGeometry.test.ts`** ตามรายการในแผน แล้วทำ mutation check
+3. commit เฟส 2
+4. **เฟส 3** ตามแผน (plugin ส่ง gateway + poll 5 วิ, calibration.ts, health.ts, BaselineContext, diagnostics, SignalHealthCard, ป้ายการบัง) + test + mutation check
+5. อัปเดต `CONTEXT.md` (Site, Quick Room, Calibration Offset, Signal Health, Live Mirror ความหมายใหม่, Monitored Room) และ `docs/DEMO.md` ข้อ 2–3 ให้ใช้ ของจริง → ห้องใหม่ → วางตำแหน่งอุปกรณ์
+6. รัน E2E (port อื่น) แก้ที่พัง → merge `feature/live-link` → `dev` (ถามเจ้าของก่อน)
+
+### 5.3 หลัง Live Link (ตกลงทิศทางแล้ว ยังไม่ออกแบบละเอียด)
+- **ESP32 เฟสแรก:** เป้าคือ "จับคนนิ่ง" ด้วยการประมวลผลสัญญาณ (CSI, จังหวะหายใจ 0.1–0.5 Hz, FFT) **ไม่ใช้ AI** ใช้ 1–2 บอร์ด แต่ละคู่บอร์ด = 1 Link บนผังด้วยระบบ Live Link นี้
+- ตำแหน่งละเอียด/ตรวจคนล้ม ต้องใช้ ML + เก็บข้อมูลจริง ไว้ทีหลัง
+- ทางให้ระบบบน cloud แสดงข้อมูลจริง: agent บนเครื่องส่งค่า → realtime relay (เช่น Ably) → หน้าเว็บ Vercel (คุยไว้ ยังไม่ทำ) · ทางเสียบ ESP32 ผ่าน USB + Web Serial ก็เป็นตัวเลือก
 
 ---
 
-## 5. งานถัดไป: Pilot — Motion Detection ผ่านผนัง
+## 6. คำถามที่ยังค้าง / พักไว้
 
-ผ่าน grilling session แล้ว ตกลงกันดังนี้ (ศัพท์ทั้งหมดดูใน [CONTEXT.md](../CONTEXT.md))
-
-### 5.1 ขอบเขต
-
-- **ห้องเล็ก 1 ห้อง** (Monitored Room) มี 1 Link:
-  - **Transmitter** = router ที่บ้าน
-  - **Receiver** = Mac laptop อ่าน RSSI (iPhone อ่าน RSSI ไม่ได้ ส่วน Android ใช้ได้)
-- **เป้าหมาย:** Motion Detection ตอบใช่/ไม่ ต่อหน้าต่างเวลาว่ามีอะไรเคลื่อนไหวในห้อง
-  - แยกคนกับสัตว์ไม่ได้
-  - "ไม่มีการเคลื่อนไหว" ≠ "ห้องว่าง" (คนนอนหลับหรือล้มอยู่ก็นิ่ง)
-- **หลักการ:**
-  - เทียบความแกว่งของ Readings กับ **Baseline** ที่อัดไว้ตอนห้องว่าง
-  - อัด Baseline ใหม่ทุกครั้งที่ย้ายอุปกรณ์
-  - ใช้ hysteresis กันการกะพริบ
-- **วางอุปกรณ์:** ให้ Coverage ของ Link อยู่ในห้องเป้าหมาย ส่วนตัวอุปกรณ์จะอยู่นอกห้องก็ได้
-- **เกณฑ์ผ่าน:**
-  - จับได้ ≥ 90% ภายใน 5 วินาที
-  - False Alarm ≤ 1 ครั้งต่อชั่วโมง
-
-### 5.2 บทบาทของ twin
-
-| บทบาท | ทำอะไร |
-|---|---|
-| **Placement Plan** | แนะนำตำแหน่ง Transmitter/Receiver ให้ Coverage ครอบห้องเป้าหมาย |
-| **Virtual Link** | sim สร้าง Readings จากคนจำลอง ใช้พัฒนาตัวตรวจจับและวัดผลเทียบ Ground Truth ก่อนมีของจริง โดยใช้ **ตัวตรวจจับตัวเดียวกัน** กับ Link จริง |
-| **Live Mirror** | แสดงผลจริงบนห้องใน twin คู่กับ Simulated Activity โดยของจริง (**Observed**) ต้องมีป้ายบอกชัดเจน |
-| **Alert Source** | ทุก Alert มีป้าย Simulated/Observed และกรองดูเฉพาะ Observed ได้ |
-| **Zone** | Motion Detection จาก WiFi trigger ได้เฉพาะ Zone ที่ใช้กับ "ทุกอย่าง" (any) เพราะแยกคน/สัตว์ไม่ได้ |
-| **Test Session** | ตอนทดสอบของจริง คนทดสอบกดปุ่ม **Activity Mark** ("เดิน" / "นิ่ง" / "ออกจากห้อง") เป็นความจริงไว้ให้คะแนน |
-
-**Ground Truth สำหรับให้คะแนน:** ถ้ามีอะไรเคลื่อนไหว **ที่ใดก็ได้ในห้อง** ถือว่ามีการเคลื่อนไหว ไม่จำกัดเฉพาะใกล้เส้น Link ดังนั้นการวางอุปกรณ์ไม่ดีจะถูกนับเป็น Missed Detection
-
-### 5.3 แผนลงมือ (เสนอ ยังไม่เริ่ม)
-
-1. เขียน pilot spec ลง `docs/design.md` (ขอบเขต + เกณฑ์ผ่านด้านบน)
-2. **Virtual Link** ใน `src/core/`:
-   - สร้าง Readings จาก rf model + model ความแกว่ง (multipath/fading) เมื่อมีคนอยู่ใกล้เส้นทางสัญญาณ (Fresnel zone)
-   - มี noise ของเซนเซอร์
-   - ใช้ seeded RNG ให้ผลซ้ำได้
-3. **Motion Detection** (pure TS):
-   - variance ต่อหน้าต่างเวลาเทียบกับ Baseline
-   - มี hysteresis
-4. **ตัววัดผล:** Missed Detection / False Alarm / latency เทียบ Ground Truth
-5. **UI:**
-   - วาง Link
-   - Placement Plan overlay
-   - ปุ่มอัด Baseline
-   - สถานะ Motion บนห้อง
-   - ป้าย Source บน Alert พร้อม filter
-   - หน้าจอ Test Session ที่มีปุ่ม Activity Mark
-6. **ตัวอ่านค่าจริง:**
-   - browser อ่าน WiFi ของเครื่องไม่ได้ จึงต้องมีโปรแกรมเล็กๆ บน Mac (CoreWLAN, Swift) อ่าน RSSI แล้วส่งเข้าแอป (เช่นผ่าน WebSocket บน localhost)
-   - Android ใช้ `WifiInfo.getRssi()`
-
-### 5.4 ยังไม่ตัดสิน (ไว้หลัง pilot)
-
-- หาตำแหน่งคนด้วยหลาย Link (RTI)
-- ใช้ CSI (ESP32-S3 + esp-csi, Intel AX210 + PicoScenes) แทน RSSI เพื่อความไว
-- ตรวจการล้มด้วย WiFi
-- ขยายไปทั้งบ้าน (Home Deployment)
-- อาจเขียน ADR เรื่อง "WiFi Sensing = device-free เท่านั้น" (เสนอไว้แล้ว ผู้ใช้ยังไม่ตอบ)
-
----
-
-## 6. คำถามที่ยังค้าง
-
-1. **การสแกนห้องเพื่อสร้างผัง:**
-   - แนะนำ Apple RoomPlan (iPhone/iPad ที่มี LiDAR) ซึ่งได้ผนัง ประตู หน้าต่าง และของเป็น parametric
-   - ทางสำรองคือ trace จากแบบแปลน
-   - WiFi สร้างผังห้องเองไม่ได้
-   - ยังไม่ได้ถามว่ามีอุปกรณ์ LiDAR หรือแบบแปลนไหม
-2. ห้องที่ห้ามมีกล้อง: สมมติไว้ว่าเป็นห้องนอน + ห้องน้ำ (ยังไม่ยืนยัน)
-3. **บั๊กเล็กที่รู้แล้วแต่ยังไม่แก้:**
-   - "สมชาย" เกิดในห้องนอนใหญ่ซึ่งเป็น Zone ห้ามเข้า เพราะบ้านตัวอย่าง populate ก่อนเพิ่ม Zone
-   - ไอคอน router ทับป้ายชื่อห้องนั่งเล่น
+- **ชื่อโปรเจกต์:** เสนอ WaveTwin (แนะนำ), Kinwave, RippleSense, WaiSense — เจ้าของยังไม่เลือก ยังไม่ได้เช็กเครื่องหมายการค้า/โดเมน
+- **ผังจริงจากการสแกน:** พักไว้ ใช้ห้องด่วนแทนก่อน (WiFi สร้างผังเองไม่ได้)
+- **Pitch deck:** อยู่ใน claude.ai artifact (เด็ค 11 หน้า "WiFi Digital Twin — Demo & Pilot") มีข้อเสนอค้าง: แก้หน้า 11 เป็นเริ่ม ESP32 1–2 ตัว, เพิ่มหน้า "ช่องทางขาย", เพิ่มหน้าเทียบกับกล้อง/เรดาร์ mmWave
+- **บั๊ก/ข้อจำกัดที่รู้แล้ว:**
+  - top bar ที่ความกว้าง ~1024 px ปุ่ม Monitor/Edit ชนป้ายสถานะ (มีมาก่อนงาน Live Link; ≥ 1280 px ปกติ)
+  - บันไดที่ขึ้นจากชั้นที่ดูอยู่โผล่เหนือระดับตัดผนังใน 3D
+  - สีห้องตามสถานะดูจาก state สด ไม่สนว่า Alert ถูกรับทราบแล้วหรือยัง
+  - Vite เตือน import ไม่มีนามสกุลใน `vite-plugins/*` (ไม่กระทบการทำงาน)
 
 ---
 
@@ -190,6 +157,12 @@ CONTEXT.md           ศัพท์โดเมน (glossary) — ใช้ค�
 - **Determinism:** sim ใช้ seeded mulberry32 ส่วน serialize เป็น byte-identical อย่าใส่ `Math.random()` หรือ key ที่ไม่เรียงลำดับ
 
 ---
+- **RSSI ของจริง:** Mac ชอบสลับกลับไป WiFi ห้องเอง (เช็ก gateway: iPhone hotspot = `172.20.10.1`) ทุกครั้งที่เปลี่ยนเครือข่ายหรือย้ายอุปกรณ์ต้องอัด Baseline ใหม่ · helper ที่ compile แล้วอยู่ `node_modules/.cache/mac-rssi/`
+- **โหมดของจริงสลับ doc ใน store:** อย่าเขียน autosave/persist โดยไม่เช็ก `reality === 'sim'` ไม่งั้นผังบ้านตัวอย่างของผู้ใช้จะถูกทับด้วยห้องด่วน
+- **id ของห้องด่วนกำหนดตายตัว** (`${siteId}-room`, `-live-tx`, `-live-rx` …) และ Live Link หาจาก id ที่ลงท้าย `-live-tx/-live-rx` ห้ามเปลี่ยนรูปแบบโดยไม่แก้ `liveLinkOf`
+- **`src/core/live/sites.ts` ต้องไม่มี import** เพราะ `tsconfig.node.json` (composite) include ไฟล์นี้ให้ plugin ใช้
+
+---
 
 ## 8. วิธีทำงานที่ตกลงกับเจ้าของโปรเจกต์
 
@@ -198,7 +171,9 @@ CONTEXT.md           ศัพท์โดเมน (glossary) — ใช้ค�
 - **ลำดับความสำคัญ:**
   - อยากเห็น demo ก่อน test จำนวนมาก
   - UI ต้องสวยระดับนำเสนอโครงการได้
-- **การใช้ AI agent:** ถ้าใช้หลายตัวแบ่งงาน ให้ Opus วางแผน, Sonnet เขียนโค้ด, Haiku เขียนและรัน test
+- **การใช้ AI agent:** ถ้าใช้หลายตัวแบ่งงาน ให้ตัวเก่งสุดวางแผน ตัวกลางเขียนโค้ด ตัวถูกสุดเขียน/รัน test (ใน Claude Code: Opus / Sonnet / Haiku)
   - test ที่ Haiku เขียนต้องตรวจซ้ำ เคยได้ test กลวงและข้าม scenario
   - ควรมี helper และ test ตัวอย่างให้ก่อน แล้วลองแก้โค้ดให้ผิดดูว่า test จับได้จริง (mutation check)
 - **ภาษาที่ใช้ในโค้ดและ UI:** ใช้ศัพท์ตาม [CONTEXT.md](../CONTEXT.md) เช่น Reading ไม่ใช่ sample, False Alarm ไม่ใช่ false positive
+- **Git:** แตก branch จาก `dev` ต่องาน commit/push เมื่อเจ้าของสั่งเท่านั้น
+- **การพูดถึงความสามารถ:** อย่าเคลมเกินจริง เช่น "แม่นกว่ากล้อง/เรดาร์" หรือ "รู้ว่าเป็นใคร" — จุดขายคือครอบคลุมทั้งบ้านด้วยอุปกรณ์น้อย ติดตั้งง่าย ไม่มีกล้อง และเป็นแพลตฟอร์มรวมเซนเซอร์บน twin

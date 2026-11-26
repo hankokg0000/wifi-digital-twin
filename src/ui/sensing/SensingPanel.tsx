@@ -3,12 +3,17 @@ import { CircleDot, FolderOpen, Footprints, Radio, Square, Undo2 } from 'lucide-
 import { useSceneStore } from '../store';
 import { Section } from '../components/Section';
 import { SensingChart } from './SensingChart';
+import { MotionPreview } from './MotionPreview';
+import { LiveSetup } from '../live/LiveSetup';
 import {
   BASELINE_SECONDS,
+  SENSING_ORIGIN_LABEL,
   backToLive,
   cancelBaseline,
   parseRecording,
   resolveMonitoredRoom,
+  selectCurrentVerdict,
+  selectSensingOrigin,
   sensingBuffers,
   setMonitoredRoomId,
   startBaseline,
@@ -54,29 +59,36 @@ function ConnectionLine() {
 }
 
 function StatusLine() {
-  const verdict = useSensingStore((s) => s.verdict);
+  const verdict = useSensingStore(selectCurrentVerdict);
   const baseline = useSensingStore((s) => s.baseline);
   const progress = useSensingStore((s) => s.baselineProgress);
-  if (!baseline) {
-    return <p className="sensing-status idle sensing-status-hint">ยังไม่มี Baseline — กดอัดตอนห้องไม่มีคนเดิน</p>;
-  }
-  if (progress !== null || !verdict) {
-    return <p className="sensing-status idle">{progress !== null ? 'กำลังอัด Baseline…' : 'กำลังวิเคราะห์…'}</p>;
-  }
-  return verdict.motion ? (
-    <p className="sensing-status motion" role="status">
-      <span className="sensing-pulse" aria-hidden="true" />
-      มีการเคลื่อนไหว
-    </p>
-  ) : (
-    <p className="sensing-status idle" role="status">ไม่มีการเคลื่อนไหว</p>
+  const origin = useSensingStore(selectSensingOrigin);
+  const replayEnded = useSensingStore((s) => s.source === 'replay' && s.replayProgress >= 1);
+  const motion = verdict?.motion === true;
+  let text: string;
+  if (replayEnded) text = 'เล่นย้อนหลังจบแล้ว';
+  else if (progress !== null) text = 'กำลังอัด Baseline…';
+  else if (origin === null) text = 'รอสัญญาณ WiFi';
+  else if (origin !== 'replay' && !baseline) text = 'ยังไม่มี Baseline — กดอัดตอนห้องไม่มีคนเดิน';
+  else if (!verdict) text = 'กำลังวิเคราะห์…';
+  else text = motion ? 'มีการเคลื่อนไหว' : 'ไม่มีการเคลื่อนไหว';
+
+  return (
+    <div className="sensing-status-row">
+      <p className={`sensing-status ${motion ? 'motion' : 'idle'}${verdict ? '' : ' sensing-status-hint'}`} role="status">
+        {text}
+      </p>
+      <MotionPreview active={motion} />
+    </div>
   );
 }
 
 export function SensingPanel() {
   const doc = useSceneStore((s) => s.doc);
+  const real = useSceneStore((s) => s.reality === 'real');
   const connection = useSensingStore((s) => s.connection);
   const source = useSensingStore((s) => s.source);
+  const origin = useSensingStore(selectSensingOrigin);
   const baseline = useSensingStore((s) => s.baseline);
   const progress = useSensingStore((s) => s.baselineProgress);
   const recording = useSensingStore((s) => s.recording);
@@ -122,15 +134,17 @@ export function SensingPanel() {
   }
 
   return (
-    <Section title="ตรวจจับ WiFi" aside={<span className="sensing-badge">{replaying ? 'ของจริง · ย้อนหลัง' : 'ของจริง'}</span>}>
+    <Section title="ตรวจจับ WiFi" aside={origin && <span className="sensing-badge">{SENSING_ORIGIN_LABEL[origin]}</span>}>
       <div className="sensing">
+        {real && <LiveSetup />}
         <ConnectionLine />
         <StatusLine />
         <SensingChart data={sensingBuffers} />
 
         <label className="sensing-field">
           <span className="field-label">ห้องที่เฝ้า</span>
-          <select className="sensing-select" value={room?.id ?? ''} onChange={(e) => setMonitoredRoomId(e.target.value)} aria-label="ห้องที่เฝ้า">
+          <select className="sensing-select" value={doc.rooms.some((r) => r.id === roomId) ? roomId! : ''} onChange={(e) => setMonitoredRoomId(e.target.value || null)} aria-label="ห้องที่เฝ้า">
+            <option value="">อัตโนมัติ (ห้องที่เส้นผ่านยาวสุด)</option>
             {doc.rooms.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} · {levelName(r.levelId)}
@@ -145,10 +159,10 @@ export function SensingPanel() {
             <span className="mono">เหลืออีก {Math.ceil(BASELINE_SECONDS * (1 - progress))} วิ — อย่าเดินผ่าน</span>
           </div>
         )}
-        {replaying && (
-          <div className="sensing-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(replayProgress * 100)}>
+        {replaying && replayProgress < 1 && (
+          <div className="sensing-progress" role="progressbar" aria-label="กำลังเล่นย้อนหลัง" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(replayProgress * 100)}>
             <div className="sensing-progress-bar" style={{ width: `${replayProgress * 100}%` }} />
-            <span className="mono">{replayProgress >= 1 ? 'เล่นย้อนหลังจบแล้ว' : 'กำลังเล่นย้อนหลัง'}</span>
+            <span className="mono">กำลังเล่นย้อนหลัง</span>
           </div>
         )}
 

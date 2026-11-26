@@ -17,6 +17,7 @@ export const createViewSlice =
     heatmap: { enabled: false, band: '2.4', source: 'best' },
 
     setMode: (m) => {
+      if (m === 'edit' && get().reality === 'real') return;
       if (m === 'edit') get().pause();
       set({ mode: m, tool: 'select', draft: null, selection: null });
     },
