@@ -7,3 +7,5 @@ test-results
 playwright-report
 .vercel
 .wdt-data
+/public/camera-twin/office-demo/
+/public/indoor-twin/site-media/

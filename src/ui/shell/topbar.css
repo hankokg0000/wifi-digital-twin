@@ -33,6 +33,11 @@
   text-overflow: ellipsis;
 }
 
+.topbar .indoor-twin-link { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 1200px) {
+  .topbar .indoor-twin-link span { display: none; }
+}
+
 .topbar .seg-btn svg {
   color: var(--ink-3);
 }

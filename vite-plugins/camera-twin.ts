@@ -7,10 +7,15 @@ import { ROOM_SCAN_API } from '../src/core/camera/room-scan';
 import { ROOM_MONITOR_API } from '../src/core/camera/room-monitor';
 import { createRoomScanner } from './camera-room-scan';
 import { createRoomMonitor } from './camera-room-monitor';
+import { createIndoorWifi } from './indoor-wifi';
+import { createWifiCsiMonitor } from '../helper/camera/wifi-csi';
+import { createEspCsiMonitor } from '../helper/camera/esp32-csi';
+import { INDOOR_WIFI_API } from '../src/core/camera/csi-monitor';
+import { DEMO_AREAS } from '../src/core/camera/site-demo';
 import { createCameraClips } from './camera-clips';
 import { readDetections } from '../helper/camera/frames';
 import {
-  CAMERA_SNAPSHOT_PATH, CAMERA_STEP_MS, CAMERA_STREAM_PATH, replaySnapshot, type CameraReplay, type CameraSnapshot,
+  CAMERA_API, CAMERA_SNAPSHOT_PATH, CAMERA_STEP_MS, CAMERA_STREAM_PATH, INDOOR_CLIP_API, replaySnapshot, type CameraReplay, type CameraSnapshot,
 } from '../src/core/camera/feed';
 import { createCameraTracker, type CameraTrackingFrame, type FloorCalibration } from '../src/core/camera/tracking';
 
@@ -32,8 +37,11 @@ function feed(root: string, httpServer: ViteDevServer['httpServer']) {
   const epoch = Date.now();
   const abort = new AbortController();
   const clips = createCameraClips(root, abort.signal, Boolean(rtsp));
+  const indoor = new Map(DEMO_AREAS.map(({ id }) => [id, createCameraClips(root, abort.signal, false, id)]));
+  const esp32 = createEspCsiMonitor();
+  const indoorWifi = createIndoorWifi(createWifiCsiMonitor(abort.signal));
   const scanner = createRoomScanner(root, abort.signal);
-  const monitor = createRoomMonitor(root, scanner.activeRoom, abort.signal);
+  const monitor = createRoomMonitor(root, scanner.activeRoom, abort.signal, esp32);
   let area: FloorCalibration['floor'] | null = null;
   let latest: CameraTrackingFrame | null = null;
   let lastFrame = 0;
@@ -104,6 +112,18 @@ function feed(root: string, httpServer: ViteDevServer['httpServer']) {
 
   return (request: IncomingMessage, response: ServerResponse, next: () => void) => {
     const path = request.url?.split('?')[0];
+    if (path?.startsWith(INDOOR_WIFI_API)) {
+      indoorWifi.handle(request, response, path);
+      return;
+    }
+    if (path?.startsWith(INDOOR_CLIP_API + '/')) {
+      const slug = path.startsWith(INDOOR_CLIP_API + '/areas/') ? path.slice((INDOOR_CLIP_API + '/areas/').length).split('/')[0] : 'office';
+      const room = DEMO_AREAS.find(({ id }) => id === slug);
+      const library = room && indoor.get(room.id);
+      if (library) library.middleware(request, response, path, next);
+      else next();
+      return;
+    }
     if (path?.startsWith(ROOM_MONITOR_API)) {
       monitor(request, response, path);
       return;
@@ -113,7 +133,7 @@ function feed(root: string, httpServer: ViteDevServer['httpServer']) {
       return;
     }
     if (path !== CAMERA_STREAM_PATH && path !== CAMERA_SNAPSHOT_PATH) {
-      if (path?.startsWith('/camera-twin/api/')) clips.middleware(request, response, path, next);
+      if (path?.startsWith(CAMERA_API + '/')) clips.middleware(request, response, path, next);
       else next();
       return;
     }

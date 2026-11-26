@@ -53,7 +53,8 @@ function filename(request: IncomingMessage) {
   return 'คลิปเดโม';
 }
 
-export function createRoomMonitor(root: string, activeRoom: () => Promise<MonitorRoom | null>, signal: AbortSignal) {
+export function createRoomMonitor(root: string, activeRoom: () => Promise<MonitorRoom | null>, signal: AbortSignal,
+  esp32: ReturnType<typeof createEspCsiMonitor>) {
   const directory = resolve(root, '.wdt-data', 'room-monitor');
   const demoPath = resolve(directory, 'demo.json');
   const prefsPath = resolve(directory, 'preferences.json');
@@ -65,7 +66,6 @@ export function createRoomMonitor(root: string, activeRoom: () => Promise<Monito
   let demo = readJson<SavedDemo>(demoPath);
   let uploading = false;
   let simulatedUntil = 0;
-  const esp32 = createEspCsiMonitor();
 
   let roomKey = '';
   let room: MonitorRoom | null = null;

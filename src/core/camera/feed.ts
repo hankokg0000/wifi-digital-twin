@@ -5,6 +5,10 @@ import type { Vec2 } from '../scene/types';
 import { createCameraTracker, type CameraPersonDetection, type CameraTrack, type FloorCalibration, type PersonDetection } from './tracking';
 
 export const CAMERA_API = '/camera-twin/api';
+export const INDOOR_CLIP_API = '/indoor-twin/api';
+export function indoorClipApi(room: string) {
+  return room === 'office' ? INDOOR_CLIP_API : `${INDOOR_CLIP_API}/areas/${room}`;
+}
 export const CAMERA_OPERATOR_PATH = `${CAMERA_API}/operator`;
 export const CAMERA_LAYOUT_PREVIEW_PATH = `${CAMERA_API}/layout/preview`;
 export const CAMERA_LAYOUT_SAVE_PATH = `${CAMERA_API}/layout/save`;
@@ -12,6 +16,7 @@ export const CAMERA_GENERATE_SCENE_PATH = `${CAMERA_API}/scene/generate`;
 export const CAMERA_SCENE_PREFIX = `${CAMERA_API}/scenes/`;
 export const CAMERA_REANALYZE_PATH = `${CAMERA_API}/tracking/reanalyze`;
 export const CAMERA_CHAIRS_PATH = `${CAMERA_API}/chairs`;
+export const CAMERA_DEMO_CHAIRS_PATH = `${CAMERA_API}/demo/chairs`;
 export const CAMERA_UPLOAD_PATH = `${CAMERA_API}/upload`;
 export const CAMERA_PUBLISH_PATH = `${CAMERA_API}/publish`;
 export const CAMERA_MEDIA_PREFIX = `${CAMERA_API}/clips/`;

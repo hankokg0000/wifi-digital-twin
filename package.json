@@ -11,6 +11,8 @@
     "e2e": "playwright test",
     "preview": "vite preview",
     "camera:prepare": "node --import tsx helper/camera/prepare-replay.ts",
+    "camera:prepare-demo": "node --import tsx helper/camera/prepare-office-demo.ts",
+    "camera:prepare-area": "node --import tsx helper/camera/prepare-area-demo.ts",
     "camera:setup-chairs": "node --import tsx helper/camera/setup-chairs.ts",
     "camera:setup-scene": "node --import tsx helper/camera/setup-scene.ts"
   },

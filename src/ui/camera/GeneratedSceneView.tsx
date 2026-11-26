@@ -1,11 +1,13 @@
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Line, OrbitControls } from '@react-three/drei';
-import { useEffect, useMemo, useState } from 'react';
-import { BufferGeometry, DoubleSide, Float32BufferAttribute, Shape, Vector2 } from 'three';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BufferGeometry, DoubleSide, Float32BufferAttribute, Shape, Vector2, type Group } from 'three';
 import type { CameraScene } from '../../core/camera/feed';
 import type { FloorPlanGeometry, GeneratedFloorPlan, PlanObject, PlanObjectKind } from '../../core/camera/floor-plan';
 import type { SceneObservation } from '../../core/camera/generated-scene';
 import type { UsdRoomModel } from '../../core/camera/plan-import';
+import { moveAvatar, type DemoArea } from '../../core/camera/site-demo';
+import { WifiPlacement } from './WifiPlacement';
 
 const kinds: Record<PlanObjectKind, { label: string; color: string }> = {
   shelf: { label: 'ชั้นวาง', color: '#7899ca' },
@@ -23,11 +25,14 @@ const surfaceColors = {
   floor: '#515f77', wall: '#8f9bb5', frame: '#b3c1d5', glass: '#69c5ba', furniture: '#a9b6ce',
 };
 
-function PlanLights() {
+function PlanLights({ studio = false }: { studio?: boolean }) {
   return <>
-    <ambientLight intensity={1.14} />
+    <ambientLight intensity={studio ? 0.57 : 1.14} />
     <hemisphereLight args={['#dce5fd', '#303649', 1.08]} />
-    <directionalLight position={[-2, 7, 3]} color="#fff1dc" intensity={2.28} />
+    <directionalLight position={studio ? [-9, 16, 1] : [-2, 7, 3]} color={studio ? '#ffe0b8' : '#fff1dc'}
+      intensity={studio ? 2.05 : 2.28} castShadow={studio}
+      shadow-mapSize={[1536, 1536]} shadow-camera-left={-25} shadow-camera-right={25}
+      shadow-camera-top={24} shadow-camera-bottom={-24} shadow-normalBias={0.025} shadow-radius={3} />
   </>;
 }
 
@@ -53,28 +58,33 @@ function UsdSurface({ surface, transparentWalls }: {
 
 function Solid({ position, size, color }: { position: Triple; size: Triple; color: string }) {
   return (
-    <mesh position={position}>
+    <mesh position={position} castShadow receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial color={color} roughness={0.83} />
     </mesh>
   );
 }
 
-function ObjectModel({ model }: { model: PlanObject }) {
+function ObjectModel({ model, furniture, stocked }: { model: PlanObject; furniture?: string; stocked?: boolean }) {
   const { kind, center: [x, z], width: w, length: d, height: h, rotation } = model;
-  const { color } = kinds[kind];
+  const color = stocked && kind === 'shelf' ? '#974b35'
+    : furniture && (kind === 'desk' || kind === 'unknown') ? furniture : kinds[kind].color;
   const thin = Math.min(0.055, w * 0.1, d * 0.12, h * 0.14);
   return (
     <group position={[x, 0.025, z]} rotation={[0, rotation, 0]}>
       {kind === 'shelf' ? (
         <>
-          <Solid position={[0, h / 2, -d / 2 + thin / 2]} size={[w, h, thin]} color="#536888" />
+          <Solid position={[0, h / 2, -d / 2 + thin / 2]} size={[w, h, thin]} color={stocked ? '#555b60' : '#536888'} />
           {[-1, 1].map((edge) => (
             <Solid key={edge} position={[(w - thin) * edge / 2, h / 2, 0]} size={[thin, h, d]} color={color} />
           ))}
           {[0.12, 0.44, 0.74, 0.96].map((tier) => (
             <Solid key={tier} position={[0, h * tier, 0]} size={[w, thin, d]} color={color} />
           ))}
+          {stocked && [0.12, 0.44, 0.74].flatMap(tier => [-0.34, -0.1, 0.14, 0.36].map((bay, index) => (
+            <Solid key={`${tier}:${bay}`} position={[w * bay, h * (tier + 0.112), 0.08]}
+              size={[w * 0.15, h * 0.19, d * (index % 2 ? 0.52 : 0.72)]} color={index % 2 ? '#d2b290' : '#b88154'} />
+          )))}
         </>
       ) : kind === 'basket' ? (
         <>
@@ -117,7 +127,9 @@ function ObjectModel({ model }: { model: PlanObject }) {
   );
 }
 
-function PlanStage({ plan, outlineOnly }: { plan: FloorPlanGeometry; outlineOnly: boolean }) {
+export function PlanStage({ plan, outlineOnly = false, lit = true, tone }: {
+  plan: FloorPlanGeometry; outlineOnly?: boolean; lit?: boolean; tone?: DemoArea['tone'];
+}) {
   const [left, front, right, back] = plan.bounds;
   const span = Math.max(right - left, back - front);
   const surface = useMemo(() => {
@@ -132,106 +144,119 @@ function PlanStage({ plan, outlineOnly }: { plan: FloorPlanGeometry; outlineOnly
 
   return (
     <>
-      <PlanLights />
+      {lit && <PlanLights studio={Boolean(tone)} />}
       {!outlineOnly && <Solid position={[(left + right) / 2, -0.066, (front + back) / 2]}
-        size={[right - left, 0.12, back - front]} color="#30374d" />}
-      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        size={[right - left, 0.12, back - front]} color={tone?.base ?? '#30374d'} />}
+      <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <shapeGeometry args={[surface]} />
-        <meshStandardMaterial color="#46536d" roughness={0.93} />
+        <meshStandardMaterial color={tone?.floor ?? '#46536d'} roughness={0.93} />
       </mesh>
       {plan.walls.map(({ from: [ax, az], to: [bx, bz], inferred }, index) => {
         if (inferred) {
           return <Line key={index} points={[[ax, 0.09, az], [bx, 0.09, bz]]}
             color="#b0a0db" transparent opacity={0.85} lineWidth={1.65} dashed dashSize={span * 0.023} gapSize={span * 0.016} />;
         }
-        const wallHeight = span * 0.105;
+        const wallHeight = tone ? 1.8 : span * 0.105;
         return (
           <group key={index} position={[(ax + bx) / 2, 0, (az + bz) / 2]} rotation={[0, -Math.atan2(bz - az, bx - ax), 0]}>
-            <Solid position={[0, wallHeight / 2, 0]} size={[Math.hypot(bx - ax, bz - az), wallHeight, span * 0.012]} color="#78819a" />
+            <Solid position={[0, wallHeight / 2, 0]} size={[Math.hypot(bx - ax, bz - az), wallHeight, span * 0.012]} color={tone?.wall ?? '#78819a'} />
           </group>
         );
       })}
-      {plan.objects.map((model, index) => <ObjectModel key={index} model={model} />)}
+      {plan.objects.map((model, index) => <ObjectModel key={index} model={model} furniture={tone?.furniture} stocked={tone?.stocked} />)}
+      {tone?.glazing && Array.from({ length: 4 }, (_, index) => {
+        const width = (back - front) / 4;
+        const z = front + width * (index + 0.5);
+        return <group key={index}>
+          <Solid position={[left + 0.03, 2.19, z]} size={[0.13, 1.44, width - 0.13]} color="#869fa7" />
+          <Solid position={[left + 0.14, 2.92, z]} size={[0.22, 0.08, width]} color="#454a4b" />
+          <Solid position={[left + 0.14, 2.2, z + width / 2 - 0.06]} size={[0.21, 1.46, 0.10]} color="#43484a" />
+        </group>;
+      })}
+      {tone?.display && <>
+        <Solid position={[(left + right) / 2, 1.93, front + 0.20]} size={[3.5, 1.74, 0.16]} color="#28323b" />
+        <Solid position={[(left + right) / 2, 1.93, front + 0.29]} size={[3.29, 1.54, 0.04]} color="#e3e4db" />
+      </>}
+      {tone?.timber && <>
+        <Solid position={[left + 0.19, 1.04, (front + back) / 2]} size={[0.14, 0.14, back - front - 0.05]} color="#76543d" />
+        <Solid position={[(left + right) / 2, 0.035, back - 0.09]} size={[right - left - 0.04, 0.15, 0.17]} color="#ad9478" />
+      </>}
     </>
   );
 }
 
-function HumanFigure({ height, simulated }: { height: number; simulated: boolean }) {
-  const shirt = simulated ? '#54e0cb' : '#b492fa';
-  const skin = simulated ? '#c8fff0' : '#efe0ff';
-  const trousers = simulated ? '#31948a' : '#805ac7';
-  const material = { roughness: 0.7, transparent: simulated, opacity: simulated ? 0.96 : 1,
-    depthTest: !simulated, depthWrite: !simulated };
-
-  // Local units are fractions of standing height. Keep the limbs apart so
-  // the silhouette stays legible in the elevated floor-plan view.
+function TrackedFigure({ x, z, radius, height, simulated, seat }: {
+  x: number; z: number; radius: number; height: number; simulated: boolean; seat?: SceneObservation['seat'];
+}) {
+  const root = useRef<Group>(null);
+  const origin = useRef<[number, number, number]>([x, 0.035, z]);
+  const color = seat?.side === 'right' ? '#f2ba72' : simulated ? '#57dfcf' : '#bf9df7';
+  const overlay = simulated && !seat;
+  const layer = overlay ? 6 : 0;
+  useFrame((_, delta) => {
+    const group = root.current;
+    if (!group) return;
+    const [nextX, nextZ] = moveAvatar(group.position.x, group.position.z, x, z, delta);
+    group.position.x = nextX;
+    group.position.z = nextZ;
+  });
+  const material = { color, transparent: overlay, opacity: 0.98, depthWrite: !overlay, depthTest: !overlay, roughness: 0.72 };
   return (
-    <group name="human-figure" scale={height}>
-      <mesh name="torso" position={[0, 0.64, 0]} scale={[0.126, 0.18, 0.074]} renderOrder={simulated ? 6 : 0}>
-        <sphereGeometry args={[1, 14, 10]} />
-        <meshStandardMaterial color={shirt} {...material} />
+    <group ref={root} position={origin.current} name={simulated ? 'simulated-floor-position' : 'camera-floor-position'}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={Math.max(0, layer - 1)}>
+        <ringGeometry args={[radius * 0.84, radius, 24]} />
+        <meshBasicMaterial color={color} depthTest={!overlay} depthWrite={!overlay} />
       </mesh>
-      <mesh name="neck" position={[0, 0.826, 0.01]} renderOrder={simulated ? 7 : 0}>
-        <cylinderGeometry args={[0.037, 0.043, 0.06, 10]} />
-        <meshStandardMaterial color={skin} {...material} />
-      </mesh>
-      <mesh name="head" position={[0, 0.91, 0.012]} scale={[0.075, 0.09, 0.072]} renderOrder={simulated ? 8 : 0}>
-        <sphereGeometry args={[1, 14, 10]} />
-        <meshStandardMaterial color={skin} {...material} />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <group key={side}>
-          <mesh name="arm" position={[side * 0.151, 0.644, 0.013]} rotation={[0, 0, side * 0.24]} renderOrder={simulated ? 7 : 0}>
-            <capsuleGeometry args={[0.036, 0.196, 4, 10]} />
-            <meshStandardMaterial color={shirt} {...material} />
-          </mesh>
-          <mesh name="hand" position={[side * 0.183, 0.518, 0.013]} scale={[0.031, 0.048, 0.03]} renderOrder={simulated ? 7 : 0}>
-            <sphereGeometry args={[1, 10, 8]} />
-            <meshStandardMaterial color={skin} {...material} />
-          </mesh>
-          <mesh name="leg" position={[side * 0.066, 0.251, side * 0.018]} rotation={[0, 0, side * 0.063]} renderOrder={simulated ? 6 : 0}>
-            <capsuleGeometry args={[0.046, 0.37, 4, 10]} />
-            <meshStandardMaterial color={trousers} {...material} />
-          </mesh>
-          <mesh name="foot" position={[side * 0.08, 0.027, 0.053 + side * 0.018]} scale={[0.046, 0.027, 0.093]} renderOrder={simulated ? 7 : 0}>
-            <sphereGeometry args={[1, 10, 8]} />
-            <meshStandardMaterial color={trousers} {...material} />
-          </mesh>
-        </group>
-      ))}
+      <group scale={seat ? 1.55 : height} rotation-y={seat?.rotation ?? 0}>
+        <mesh position={[0, seat ? 0.79 : 0.88, 0]} renderOrder={layer}>
+          <sphereGeometry args={[0.085, 10, 7]} />
+          <meshStandardMaterial {...material} />
+        </mesh>
+        <mesh position={[0, seat ? 0.57 : 0.60, 0]} renderOrder={layer}>
+          <capsuleGeometry args={[0.115, 0.215, 3, 8]} />
+          <meshStandardMaterial {...material} />
+        </mesh>
+        {[-1, 1].map(side => (
+          <group key={side} position-x={side * 0.065}>
+            {seat && <mesh position={[0, 0.33, -0.11]} rotation-x={Math.PI / 2}>
+              <capsuleGeometry args={[0.047, 0.18, 2, 7]} />
+              <meshStandardMaterial {...material} />
+            </mesh>}
+            <mesh position={[0, seat ? 0.18 : 0.22, seat ? -0.22 : 0]}
+              rotation-z={seat ? 0 : side * 0.09} renderOrder={layer}>
+              <capsuleGeometry args={[0.045, seat ? 0.24 : 0.33, 2, 7]} />
+              <meshStandardMaterial {...material} />
+            </mesh>
+          </group>
+        ))}
+      </group>
     </group>
   );
 }
 
-function PositionMarkers({ observations, span, simulated }: { observations: SceneObservation[]; span: number; simulated: boolean }) {
-  const radius = span * 0.037;
-  return observations.map(({ position, id }) => {
-    if (!position) return null;
-    const [x, z] = position;
-    return (
-      <group key={id} name={simulated ? 'simulated-floor-position' : 'camera-floor-position'} position={[x, 0.035, z]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={simulated ? 5 : 0}>
-          <ringGeometry args={[radius * 0.78, radius, 32]} />
-          <meshBasicMaterial color={simulated ? '#54e0cb' : '#bd9bff'} transparent={simulated} depthTest={!simulated} depthWrite={!simulated} />
-        </mesh>
-        <HumanFigure height={span * 0.25} simulated={simulated} />
-      </group>
-    );
-  });
+export function PositionMarkers({ observations, span, simulated, height = span * 0.25, markerRadius = span * 0.037 }: {
+  observations: SceneObservation[]; span: number; simulated: boolean; height?: number; markerRadius?: number;
+}) {
+  return observations.map(({ position, id, seat }) => position && (
+    <TrackedFigure key={id} x={position[0]} z={position[1]} radius={markerRadius} height={height} simulated={simulated} seat={seat} />
+  ));
 }
 
-function MotionFloor({ plan }: { plan: FloorPlanGeometry }) {
+function MotionFloor({ plan, observed }: { plan: FloorPlanGeometry; observed: boolean }) {
   const floor = useMemo(() => new Shape(plan.visibleFloor.map(([x, z]) => new Vector2(x, -z))), [plan]);
   return (
     <mesh position={[0, 0.018, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <shapeGeometry args={[floor]} />
-      <meshBasicMaterial color="#f4bc69" transparent opacity={0.42} depthWrite={false} />
+      <meshBasicMaterial color={observed ? '#69efd6' : '#f4bc69'} transparent opacity={0.42} depthWrite={false} />
     </mesh>
   );
 }
 
-export function GeneratedSceneView({ scene, observations, resetKey }: {
-  scene: CameraScene; observations: SceneObservation[]; resetKey: number;
+export function GeneratedSceneView({ scene, observations, resetKey, topView, highlightMotion, simulatedPositions, wifiPlacement, motionObserved }: {
+  scene: CameraScene; observations: SceneObservation[]; resetKey: number; topView?: boolean; highlightMotion?: boolean;
+  simulatedPositions?: boolean;
+  wifiPlacement?: boolean;
+  motionObserved?: boolean;
 }) {
   const [asset, setAsset] = useState<{ url: string; data: GeneratedFloorPlan } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -255,10 +280,12 @@ export function GeneratedSceneView({ scene, observations, resetKey }: {
     return <p className="canvas-fallback">{failed === scene.url ? 'เปิดแปลนจากคลิปไม่ได้' : 'กำลังเปิดแปลนจากคลิป…'}</p>;
   }
 
-  return <FloorPlanCanvas plan={asset.data} observations={observations} resetKey={`${scene.url}:${resetKey}`} />;
+  return <FloorPlanCanvas plan={asset.data} observations={observations} resetKey={`${scene.url}:${resetKey}`}
+    topView={topView} highlightMotion={highlightMotion} simulatedPositions={simulatedPositions}
+    wifiPlacement={wifiPlacement} motionObserved={motionObserved} />;
 }
 
-export function FloorPlanCanvas({ plan, observations = [], resetKey = '', doors = [], outlineOnly = false, usdModel, transparentWalls = true, highlightMotion = false, simulatedPositions = false }: {
+export function FloorPlanCanvas({ plan, observations = [], resetKey = '', doors = [], outlineOnly = false, usdModel, transparentWalls = true, highlightMotion = false, simulatedPositions = false, topView = false, tone, wifiPlacement = false, motionObserved = false }: {
   plan: FloorPlanGeometry;
   observations?: SceneObservation[];
   resetKey?: string;
@@ -267,6 +294,10 @@ export function FloorPlanCanvas({ plan, observations = [], resetKey = '', doors 
   transparentWalls?: boolean;
   highlightMotion?: boolean;
   simulatedPositions?: boolean;
+  topView?: boolean;
+  tone?: DemoArea['tone'];
+  wifiPlacement?: boolean;
+  motionObserved?: boolean;
   doors?: { id: string; from: readonly [number, number]; to: readonly [number, number] }[];
 }) {
   const [left, front, right, back] = plan.bounds;
@@ -284,27 +315,31 @@ export function FloorPlanCanvas({ plan, observations = [], resetKey = '', doors 
   }, [usdModel]);
   const framing = Math.max(span, modelHeight.span * 1.6);
   const center: Triple = [(left + right) / 2, modelHeight.center, (front + back) / 2];
-  const position: Triple = [center[0] + framing * 0.44, center[1] + framing * 1.45, center[2] + framing * 0.92];
+  const distance = tone ? framing * 1.16 : framing;
+  const position: Triple = topView ? [center[0], center[1] + distance * 1.85, center[2] + 0.001]
+    : [center[0] + distance * 0.44, center[1] + distance * 1.45, center[2] + distance * 0.92];
   const legend = Object.keys(kinds).filter((kind): kind is PlanObjectKind => plan.objects.some((object) => object.kind === kind));
 
   return (
     <div className="generated-plan">
-      <Canvas key={resetKey} aria-label={usdModel ? 'โมเดลสามมิติจาก USDZ' : 'แปลนสามมิติ'}
+      <Canvas key={`${resetKey}:${topView}`} aria-label={usdModel ? 'โมเดลสามมิติจาก USDZ' : 'แปลนสามมิติ'}
         camera={{ position, fov: 40, near: 0.03, far: framing * 12 }}
-        dpr={[1, 1.6]} fallback={<p className="canvas-fallback">เบราว์เซอร์เปิดแปลน 3D ไม่ได้</p>}>
-        <color attach="background" args={['#191c2b']} />
+        dpr={[1, 1.6]} shadows={tone ? 'percentage' : false} fallback={<p className="canvas-fallback">เบราว์เซอร์เปิดแปลน 3D ไม่ได้</p>}>
+        <color attach="background" args={[tone ? '#151d2b' : '#191c2b']} />
         {usdModel ? <>
           <PlanLights />
           {usdModel.surfaces.map((surface, index) => <UsdSurface key={index} surface={surface} transparentWalls={transparentWalls} />)}
-        </> : <PlanStage plan={plan} outlineOnly={outlineOnly} />}
-        {highlightMotion && <MotionFloor plan={plan} />}
-        <PositionMarkers observations={observations} span={span} simulated={simulatedPositions} />
+        </> : <PlanStage plan={plan} outlineOnly={outlineOnly} tone={tone} />}
+        {highlightMotion && <MotionFloor plan={plan} observed={motionObserved} />}
+        {wifiPlacement && <WifiPlacement plan={plan} active={highlightMotion} observed={motionObserved} />}
+        <PositionMarkers observations={observations} span={span} simulated={simulatedPositions}
+          height={tone ? 1.75 : undefined} markerRadius={tone ? 0.38 : undefined} />
         {doors.map(({ id, from: [ax, az], to: [bx, bz] }) => (
           <Line key={id} points={[[ax, 0.115, az], [bx, 0.115, bz]]} color="#60cfbd" lineWidth={3} />
         ))}
         <OrbitControls target={center} minDistance={framing * 0.6} maxDistance={framing * 2.6} maxPolarAngle={1.15} />
       </Canvas>
-      {!usdModel && legend.length > 0 && (
+      {!usdModel && !tone && legend.length > 0 && (
         <ul className="generated-plan-key" aria-label="ชนิดโมเดลในแปลน">
           {legend.map((kind) => (
             <li key={kind}><i aria-hidden="true" style={{ backgroundColor: kinds[kind].color }} />{kinds[kind].label}</li>

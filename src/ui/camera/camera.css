@@ -134,6 +134,7 @@ body { overflow: auto; min-width: 295px; }
 .camera-observation { color: var(--warning); }
 .camera-observation.grounded { color: var(--accent); }
 .camera-observation.simulated, .monitor-badge.monitor-simulated-position { color: #54e0cb; }
+.camera-observation.simulated[data-seat="right"] { color: var(--seated-right, #f2ba72); }
 .camera-observation rect, .camera-observation circle {
   fill: none; stroke: currentColor; stroke-width: 2.25; vector-effect: non-scaling-stroke;
 }
