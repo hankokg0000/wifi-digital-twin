@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { sensingBuffers, useSensingStore } from './sensingStore';
+import type { Reading, Verdict } from '../../core/sensing/types';
 
 const WINDOW_S = 60;
 const HEIGHT = 120;
@@ -16,9 +16,15 @@ function cssVar(name: string): string {
  * Reads the mutable buffers straight from the store module on every animation frame; it only runs
  * while mounted and never touches React state.
  */
-export function SensingChart() {
+export function SensingChart({ data, label = 'กราฟสัญญาณ WiFi 60 วินาทีล่าสุด', windowSeconds = WINDOW_S, fitAvailable = false }: {
+  data: { readings: Reading[]; verdicts: Verdict[] };
+  label?: string;
+  windowSeconds?: number;
+  fitAvailable?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const baseline = useSensingStore((s) => s.baseline);
+  const current = useRef(data);
+  current.current = data;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -50,11 +56,13 @@ export function SensingChart() {
       raf = requestAnimationFrame(draw);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, HEIGHT);
-      const { readings, verdicts } = sensingBuffers;
+      const { readings, verdicts } = current.current;
       const last = readings[readings.length - 1];
       const tEnd = last ? last.t : 0;
-      const tStart = tEnd - WINDOW_S;
-      const x = (t: number) => ((t - tStart) / WINDOW_S) * w;
+      const elapsed = tEnd - (readings[0]?.t ?? tEnd);
+      const duration = fitAvailable ? Math.min(windowSeconds, Math.max(5, elapsed)) : windowSeconds;
+      const tStart = tEnd - duration;
+      const x = (t: number) => ((t - tStart) / duration) * w;
 
       // panels
       ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -110,6 +118,10 @@ export function SensingChart() {
       ctx.beginPath();
       pts.forEach((r, i) => (i === 0 ? ctx.moveTo(x(r.t), yr(r.rssi)) : ctx.lineTo(x(r.t), yr(r.rssi))));
       ctx.stroke();
+      if (fitAvailable && pts.length === 1) {
+        ctx.fillStyle = c.ink;
+        ctx.fillRect(w - 4, yr(last.rssi) - 1, 3, 3);
+      }
       ctx.fillStyle = c.ink3;
       ctx.font = `10px ${c.mono}`;
       ctx.textAlign = 'left';
@@ -142,7 +154,7 @@ export function SensingChart() {
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [baseline]);
+  }, [fitAvailable, windowSeconds]);
 
-  return <canvas ref={ref} className="sensing-chart" style={{ height: HEIGHT }} aria-label="กราฟสัญญาณ WiFi 60 วินาทีล่าสุด" role="img" />;
+  return <canvas ref={ref} className="sensing-chart" style={{ height: HEIGHT }} aria-label={label} role="img" />;
 }

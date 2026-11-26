@@ -19,12 +19,12 @@ async function monitorRequest<T>(route: string, options?: RequestInit) {
 
 export function CameraHome() {
   const [room, setRoom] = useState<MonitorRoom | null>();
+  const params = new URLSearchParams(location.search);
+  const preferOfficeDemo = params.get('demo') === '1';
+  const skipRoom = preferOfficeDemo || params.has('legacy') ||
+    !['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
   useEffect(() => {
-    if (new URLSearchParams(location.search).has('legacy') ||
-        !['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)) {
-      setRoom(null);
-      return;
-    }
+    if (skipRoom) return;
     const controller = new AbortController();
     void monitorRequest<MonitorRoom | null>('room', { signal: controller.signal }).then((active) => {
       if (!controller.signal.aborted) setRoom(active);
@@ -32,7 +32,8 @@ export function CameraHome() {
       if (!controller.signal.aborted) setRoom(null);
     });
     return () => controller.abort();
-  }, []);
+  }, [skipRoom]);
+  if (skipRoom) return <CameraViewer preferOfficeDemo={preferOfficeDemo} />;
   if (room === undefined) return <main className="camera-main" role="status">กำลังเปิด Camera Twin…</main>;
   return room ? <RoomMonitor room={room} /> : <CameraViewer />;
 }

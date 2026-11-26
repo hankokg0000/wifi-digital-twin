@@ -9,12 +9,12 @@ import { CameraVideoError, normalizeCameraVideo, readDetections } from '../helpe
 import { generateFloorPlan, hasFloorPlanModels } from '../helper/camera/scenes';
 import type { GeneratedFloorPlan } from '../src/core/camera/floor-plan';
 import {
-  CAMERA_CHAIRS_PATH, CAMERA_LAYOUT_PREVIEW_PATH, CAMERA_LAYOUT_SAVE_PATH, CAMERA_MEDIA_PREFIX, CAMERA_OPERATOR_PATH, CAMERA_PUBLISH_PATH, CAMERA_REANALYZE_PATH, CAMERA_UPLOAD_PATH,
+  CAMERA_API, indoorClipApi, CAMERA_CHAIRS_PATH, CAMERA_DEMO_CHAIRS_PATH, CAMERA_LAYOUT_PREVIEW_PATH, CAMERA_LAYOUT_SAVE_PATH, CAMERA_MEDIA_PREFIX, CAMERA_OPERATOR_PATH, CAMERA_PUBLISH_PATH, CAMERA_REANALYZE_PATH, CAMERA_UPLOAD_PATH,
   CAMERA_GENERATE_SCENE_PATH, CAMERA_SCENE_PREFIX, createCameraReplay, createGeneratedReplay, type CameraDraft,
 } from '../src/core/camera/feed';
-import { OFFICE_CALIBRATION } from '../src/core/camera/office';
+import { OFFICE_CALIBRATION, OFFICE_DEMO_PATH } from '../src/core/camera/office';
 import { officeRegion, readOfficeCalibration, readOfficeLayout, type OfficeLayout } from '../src/core/camera/office-layout';
-import type { CameraPersonDetection } from '../src/core/camera/tracking';
+import type { CameraPersonDetection, FloorCalibration } from '../src/core/camera/tracking';
 
 const MAX_UPLOAD = 200 * 1024 * 1024;
 const CLIP_ID = /^[0-9a-f]{24}$/;
@@ -122,8 +122,11 @@ export async function openMedia(path: string, request: IncomingMessage, response
   else await pipeline(createReadStream(path, { start, end }), response);
 }
 
-export function createCameraClips(root: string, signal: AbortSignal, live: boolean) {
-  const directory = resolve(root, '.wdt-data');
+export function createCameraClips(root: string, signal: AbortSignal, live: boolean, indoor?: string) {
+  const directory = resolve(root, '.wdt-data', indoor ? 'indoor-twin' : '', indoor && indoor !== 'office' ? indoor : '');
+  const api = indoor ? indoorClipApi(indoor) : CAMERA_API;
+  const mediaPrefix = api + CAMERA_MEDIA_PREFIX.slice(CAMERA_API.length);
+  const scenePrefix = api + CAMERA_SCENE_PREFIX.slice(CAMERA_API.length);
   const libraryPath = resolve(directory, 'camera-library.json');
   const clipDirectory = resolve(directory, 'camera-clips');
   let library: Library = readJson<Library>(libraryPath) ?? { draftId: null, publishedId: null, publishedAt: 0 };
@@ -180,6 +183,30 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
     draft = clip;
   }
 
+  async function chairsAt(video: string, time: unknown, duration: number, calibration?: FloorCalibration) {
+    if (typeof time !== 'number' || !Number.isFinite(time) || time < 0 || time >= duration) {
+      throw new ClipError(400, 'เลือกเวลาในคลิปก่อนค้นหาเก้าอี้');
+    }
+    if (!(await stat(chairModel(root)).catch(() => null))?.isDirectory()) {
+      throw new ClipError(503, 'ยังไม่ได้เตรียมโมเดลตรวจเก้าอี้บน Mac เครื่องนี้');
+    }
+    try {
+      return await detectChairs(root, video, time, signal, calibration);
+    } catch {
+      throw new ClipError(422, 'ค้นหาเก้าอี้จากเฟรมนี้ไม่สำเร็จ ลองหยุดที่เฟรมอื่น');
+    }
+  }
+
+  async function demoChairs(request: IncomingMessage) {
+    const { id, timeMs } = await readEdit(request);
+    const folder = resolve(root, 'public', '.' + OFFICE_DEMO_PATH);
+    const sample = readJson<Pick<CameraDraft, 'media' | 'replay'>>(resolve(folder, 'replay.json'));
+    if (typeof id !== 'string' || !/^[a-f0-9]{16}$/.test(id) || sample?.media.id !== id) {
+      throw new ClipError(404, 'เปิดคลิปออฟฟิศตัวอย่างอีกครั้ง');
+    }
+    return chairsAt(resolve(folder, id + '.mp4'), timeMs, sample.replay.frames.length * sample.replay.stepMs);
+  }
+
   async function edit(path: string, request: IncomingMessage) {
     const body = await readEdit(request);
     const clip = draft;
@@ -195,7 +222,7 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
         const sceneData = await generate(video, detections);
         const revision = (clip.revision ?? 0) + 1;
         const next: SavedClip = { ...clip, revision, needsCalibration: undefined,
-          scene: { kind: 'floor-plan', url: `${CAMERA_SCENE_PREFIX}${clip.id}?revision=${revision}` },
+          scene: { kind: 'floor-plan', url: `${scenePrefix}${clip.id}?revision=${revision}` },
           sceneData, replay: createGeneratedReplay(detections, sceneData) };
         await storeDraft(next, room);
         return publicClip(next);
@@ -206,19 +233,8 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
         if (calibration === null || (clip.needsCalibration && !calibration)) {
           throw new ClipError(409, 'ปรับเทียบมุมกล้องก่อนค้นหาเก้าอี้บนผัง');
         }
-        const time = body.timeMs;
         const duration = clip.replay.frames.length * clip.replay.stepMs;
-        if (typeof time !== 'number' || !Number.isFinite(time) || time < 0 || time >= duration) {
-          throw new ClipError(400, 'เลือกเวลาในคลิปก่อนค้นหาเก้าอี้');
-        }
-        if (!(await stat(chairModel(root)).catch(() => null))?.isDirectory()) {
-          throw new ClipError(503, 'ยังไม่ได้เตรียมโมเดลตรวจเก้าอี้บน Mac เครื่องนี้');
-        }
-        try {
-          return await detectChairs(root, video, time, signal, calibration);
-        } catch {
-          throw new ClipError(422, 'ค้นหาเก้าอี้จากเฟรมนี้ไม่สำเร็จ ลองหยุดที่เฟรมอื่น');
-        }
+        return await chairsAt(video, body.timeMs, duration, calibration);
       }
 
       const reanalyzing = path === CAMERA_REANALYZE_PATH;
@@ -251,6 +267,7 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
     const length = Number(request.headers['content-length']);
     if (!Number.isFinite(length) || length <= 0) throw new ClipError(400, 'เลือกไฟล์วิดีโอก่อนอัปโหลด');
     if (length > MAX_UPLOAD) throw new ClipError(413, 'ไฟล์ต้องมีขนาดไม่เกิน 200 MB');
+    if (indoor && !hasFloorPlanModels(root)) throw new ClipError(503, 'ยังไม่ได้เตรียมโมเดลสร้างแปลนบน Mac เครื่องนี้');
 
     processing = true;
     const id = randomBytes(12).toString('hex');
@@ -262,7 +279,7 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
       await mkdir(room, { recursive: true, mode: 0o700 });
       await pipeline(request, createWriteStream(raw, { mode: 0o600 }), { signal });
       await normalizeCameraVideo(raw, video, signal);
-      const mode = request.headers['x-camera-angle'];
+      const mode = indoor ? 'auto' : request.headers['x-camera-angle'];
       const needsCalibration = mode === 'new';
       const detections = await detectionsFor(id, video);
       const sceneData = mode === 'auto' ? await generate(video, detections) : undefined;
@@ -270,10 +287,10 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
         : createCameraReplay(detections, needsCalibration ? null : OFFICE_CALIBRATION);
       const clip: SavedClip = {
         id,
-        media: { id, title: titleFrom(request.headers['x-camera-file']), url: `${CAMERA_MEDIA_PREFIX}${id}` },
+        media: { id, title: titleFrom(request.headers['x-camera-file']), url: `${mediaPrefix}${id}` },
         replay,
         needsCalibration: needsCalibration || undefined,
-        scene: sceneData ? { kind: 'floor-plan', url: `${CAMERA_SCENE_PREFIX}${id}?revision=0` } : undefined,
+        scene: sceneData ? { kind: 'floor-plan', url: `${scenePrefix}${id}?revision=0` } : undefined,
         sceneData,
       };
       await writeFile(resolve(room, 'clip.json'), JSON.stringify(clip), { mode: 0o600 });
@@ -296,10 +313,11 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
     }
   }
 
-  async function handle(request: IncomingMessage, response: ServerResponse, path: string) {
-    if (path.startsWith(CAMERA_SCENE_PREFIX)) {
+  async function handle(request: IncomingMessage, response: ServerResponse, actualPath: string) {
+    const path = CAMERA_API + actualPath.slice(api.length);
+    if (actualPath.startsWith(scenePrefix)) {
       const search = new URL(request.url!, 'http://localhost').search;
-      const url = path + search;
+      const url = actualPath + search;
       const scene = draft?.scene?.kind === 'floor-plan' && draft.scene.url === url && localOperator(request, false)
         ? draft.sceneData
         : published?.scene?.kind === 'floor-plan' && published.scene.url === url ? published.sceneData : null;
@@ -309,8 +327,8 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
       return true;
     }
 
-    if (path.startsWith(CAMERA_MEDIA_PREFIX)) {
-      const id = path.slice(CAMERA_MEDIA_PREFIX.length);
+    if (actualPath.startsWith(mediaPrefix)) {
+      const id = actualPath.slice(mediaPrefix.length);
       const ownerCanRead = localOperator(request, false) && id === draft?.id;
       if (!CLIP_ID.test(id) || (id !== published?.id && !ownerCanRead)) {
         json(response, 404, { error: 'ไม่พบวิดีโอที่เผยแพร่' });
@@ -322,7 +340,8 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
       return true;
     }
 
-    if (![CAMERA_OPERATOR_PATH, CAMERA_UPLOAD_PATH, CAMERA_PUBLISH_PATH, CAMERA_CHAIRS_PATH,
+    if (indoor && path !== CAMERA_OPERATOR_PATH && path !== CAMERA_UPLOAD_PATH) return false;
+    if (![CAMERA_OPERATOR_PATH, CAMERA_UPLOAD_PATH, CAMERA_PUBLISH_PATH, CAMERA_CHAIRS_PATH, CAMERA_DEMO_CHAIRS_PATH,
       CAMERA_LAYOUT_PREVIEW_PATH, CAMERA_LAYOUT_SAVE_PATH, CAMERA_REANALYZE_PATH, CAMERA_GENERATE_SCENE_PATH].includes(path)) return false;
     const write = path !== CAMERA_OPERATOR_PATH;
     if (!localOperator(request, write)) {
@@ -333,6 +352,8 @@ export function createCameraClips(root: string, signal: AbortSignal, live: boole
       json(response, 200, { draft: draft && publicClip(draft), publishedId: published?.id ?? null, publishedRevision: published?.revision ?? 0, processing });
     } else if (path === CAMERA_UPLOAD_PATH) {
       json(response, 201, await upload(request));
+    } else if (path === CAMERA_DEMO_CHAIRS_PATH) {
+      json(response, 200, await demoChairs(request));
     } else if (path !== CAMERA_PUBLISH_PATH) {
       json(response, 200, await edit(path, request));
     } else {

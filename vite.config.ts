@@ -17,6 +17,7 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         wifi: resolve(import.meta.dirname, 'index.html'),
+        indoor: resolve(import.meta.dirname, 'indoor-twin/index.html'),
         camera: resolve(import.meta.dirname, 'camera-twin/index.html'),
         roomScan: resolve(import.meta.dirname, 'camera-twin/scan/index.html'),
       },

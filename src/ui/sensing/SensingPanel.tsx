@@ -9,6 +9,7 @@ import {
   cancelBaseline,
   parseRecording,
   resolveMonitoredRoom,
+  sensingBuffers,
   setMonitoredRoomId,
   startBaseline,
   startRecording,
@@ -125,7 +126,7 @@ export function SensingPanel() {
       <div className="sensing">
         <ConnectionLine />
         <StatusLine />
-        <SensingChart />
+        <SensingChart data={sensingBuffers} />
 
         <label className="sensing-field">
           <span className="field-label">ห้องที่เฝ้า</span>

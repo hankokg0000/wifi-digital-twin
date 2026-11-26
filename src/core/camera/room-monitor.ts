@@ -111,7 +111,9 @@ function insetFrameCoordinate(value: number) {
   return 0.08 + 0.84 * Math.max(0, Math.min(1, value));
 }
 
-function simulateFloorPosition(plan: FloorPlanGeometry, [u, v]: FloorPoint): FloorPoint | null {
+type DemoFloor = Pick<FloorPlanGeometry, 'bounds' | 'visibleFloor'>;
+
+function simulateFloorPosition(plan: DemoFloor, [u, v]: FloorPoint): FloorPoint | null {
   if (!Number.isFinite(u) || !Number.isFinite(v)) return null;
   const [, front, , back] = plan.bounds;
   const z = front + (back - front) * insetFrameCoordinate(v);
@@ -136,13 +138,14 @@ function simulateFloorPosition(plan: FloorPlanGeometry, [u, v]: FloorPoint): Flo
 }
 
 /** Estimate display positions from a clip without treating it as a calibrated camera. */
-export function simulateDemoFrames(frames: MonitorDemo['frames'], plan: FloorPlanGeometry): MonitorDemo['frames'] {
+export function simulateDemoFrames(frames: MonitorDemo['frames'], plan: DemoFloor, allowBoxEstimate = true): MonitorDemo['frames'] {
   let previous = new Map<number, FloorPoint>();
   return frames.map((frame) => {
     const anchors = new Map<number, FloorPoint>();
     const projected = frame.map((observation) => {
       const { id, box, ground } = observation;
-      // Older clips and upper-body detections can lack a visible ground point.
+      if (!ground && !allowBoxEstimate) return { ...observation, position: undefined };
+      // Older Camera Twin clips still use the approximate box-based display.
       const sample = ground ?? [box.x + box.width / 2, box.y + box.height * 1.6];
       const prior = previous.get(id);
       const anchor: FloorPoint = prior ? [prior[0] * 0.35 + sample[0] * 0.65, prior[1] * 0.35 + sample[1] * 0.65] : sample;

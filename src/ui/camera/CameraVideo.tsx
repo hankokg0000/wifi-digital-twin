@@ -13,9 +13,9 @@ function polygonPoints(points: readonly FloorPoint[]) {
 }
 
 export function TrackedBoxes({ observations, simulated = false }: { observations: SceneObservation[]; simulated?: boolean }) {
-  return observations.map(({ id, box, ground }) => (
+  return observations.map(({ id, box, ground, seat }) => (
     <g key={id} className={simulated ? 'camera-observation simulated' : ground ? 'camera-observation grounded' : 'camera-observation'}
-      data-testid="scene-video-detection">
+      data-seat={seat?.side} data-testid="scene-video-detection">
       <rect x={box.x * WIDTH} y={box.y * HEIGHT} width={box.width * WIDTH} height={box.height * HEIGHT} rx="3" />
       {ground && <circle cx={ground[0] * WIDTH} cy={ground[1] * HEIGHT} r="5" />}
     </g>

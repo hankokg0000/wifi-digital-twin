@@ -16,6 +16,7 @@ export interface SceneObservation {
   box: PersonDetection;
   ground?: FloorPoint;
   position?: FloorPoint;
+  seat?: { side: 'left' | 'right'; rotation: number };
 }
 
 export interface BackgroundSample {

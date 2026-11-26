@@ -1,4 +1,4 @@
-import { Siren, TriangleAlert, Check, Play, Undo2, Redo2, Eye, Pencil } from 'lucide-react';
+import { Siren, TriangleAlert, Check, Play, Undo2, Redo2, Eye, Pencil, Box } from 'lucide-react';
 import { useSceneStore } from '../store';
 import { useMonitorModel } from '../sim/useMonitorModel';
 import { startDemo } from '../demo';
@@ -62,6 +62,9 @@ export function TopBar() {
         <BrandMark />
         <span className="brand-name">WiFi Digital Twin</span>
         <span className="brand-house">บ้านตัวอย่าง 2 ชั้น</span>
+        <a className="btn btn-sm indoor-twin-link" href="/indoor-twin/" aria-label="เปิด Indoor Twin">
+          <Box size={15} aria-hidden="true" /><span>Indoor Twin</span>
+        </a>
       </div>
 
       <Segmented
